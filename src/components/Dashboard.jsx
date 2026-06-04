@@ -1,20 +1,22 @@
 import { useMemo } from 'react';
 import { 
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area 
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area 
 } from 'recharts';
 import { Trophy, Flame, Dumbbell, TrendingUp } from 'lucide-react';
 
-export function Dashboard({ user, history }) {
+export function Dashboard({ profile, history }) {
   const stats = useMemo(() => {
     if (!history || history.length === 0) return null;
 
     // Calculate total volume
     const totalVolume = history.reduce((acc, workout) => {
-      return acc + workout.exercises.reduce((exAcc, ex) => {
-        return exAcc + ex.sets.reduce((setAcc, set) => {
+      const workoutVolume = workout.exercises?.reduce((exAcc, ex) => {
+        const exerciseVolume = ex.sets?.reduce((setAcc, set) => {
           return setAcc + (parseFloat(set.weight) * parseInt(set.reps) || 0);
-        }, 0);
-      }, 0);
+        }, 0) || 0;
+        return exAcc + exerciseVolume;
+      }, 0) || 0;
+      return acc + workoutVolume;
     }, 0);
 
     // Calculate streak
@@ -34,16 +36,16 @@ export function Dashboard({ user, history }) {
       }
     }
 
-    // Chart data: Estimated 1RM over time (taking the max 1RM of any exercise per session)
+    // Chart data: Estimated 1RM over time
     const chartData = history.slice().reverse().map(workout => {
-      const max1RM = Math.max(...workout.exercises.flatMap(ex => 
-        ex.sets.map(set => {
+      const max1RM = Math.max(...(workout.exercises?.flatMap(ex => 
+        ex.sets?.map(set => {
           const w = parseFloat(set.weight);
           const r = parseInt(set.reps);
-          if (r === 0) return 0;
+          if (r === 0 || isNaN(w) || isNaN(r)) return 0;
           return w * (1 + r / 30); // Epley formula
-        })
-      ));
+        }) || [0]
+      ) || [0]));
       
       return {
         date: new Date(workout.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
@@ -62,7 +64,7 @@ export function Dashboard({ user, history }) {
   if (!stats) {
     return (
       <div className="p-6 space-y-6">
-        <h1 className="text-3xl font-bold">Welcome back, {user.name}!</h1>
+        <h1 className="text-3xl font-bold">Welcome back, {profile?.name || 'Lifter'}!</h1>
         <div className="bg-card border border-border p-8 rounded-2xl text-center space-y-4">
           <Dumbbell className="w-12 h-12 text-muted-foreground mx-auto" />
           <p className="text-muted-foreground">No workouts logged yet. Start your journey today!</p>
@@ -74,7 +76,7 @@ export function Dashboard({ user, history }) {
   return (
     <div className="p-6 space-y-6 pb-24 lg:pb-6">
       <header className="space-y-1">
-        <h1 className="text-3xl font-bold">Welcome back, {user.name}</h1>
+        <h1 className="text-3xl font-bold">Welcome back, {profile?.name}</h1>
         <p className="text-muted-foreground">Here's how you're performing lately.</p>
       </header>
 
@@ -95,7 +97,7 @@ export function Dashboard({ user, history }) {
           </div>
           <div>
             <p className="text-sm text-muted-foreground">Total Volume</p>
-            <p className="text-2xl font-bold">{stats.totalVolume.toLocaleString()} {user.units}</p>
+            <p className="text-2xl font-bold">{stats.totalVolume.toLocaleString()} {profile?.units}</p>
           </div>
         </div>
 
@@ -159,16 +161,16 @@ export function Dashboard({ user, history }) {
           {history.slice(0, 3).map((workout) => (
             <div key={workout.id} className="bg-card border border-border p-4 rounded-xl flex justify-between items-center">
               <div>
-                <p className="font-medium">{workout.routineName}</p>
+                <p className="font-medium">{workout.routine_name}</p>
                 <p className="text-sm text-muted-foreground">
-                  {new Date(workout.date).toLocaleDateString()} • {workout.exercises.length} Exercises
+                  {new Date(workout.date).toLocaleDateString()} • {workout.exercises?.length || 0} Exercises
                 </p>
               </div>
               <div className="text-right">
                 <p className="font-bold text-primary">
-                  {Math.round(workout.exercises.reduce((acc, ex) => 
-                    acc + ex.sets.reduce((sAcc, set) => sAcc + (parseFloat(set.weight) * parseInt(set.reps) || 0), 0)
-                  , 0)).toLocaleString()} {user.units}
+                  {Math.round(workout.exercises?.reduce((acc, ex) => 
+                    acc + (ex.sets?.reduce((sAcc, set) => sAcc + (parseFloat(set.weight) * parseInt(set.reps) || 0), 0) || 0)
+                  , 0) || 0).toLocaleString()} {profile?.units}
                 </p>
               </div>
             </div>

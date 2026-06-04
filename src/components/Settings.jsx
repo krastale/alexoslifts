@@ -1,33 +1,12 @@
-import { useRef } from 'react';
-import { Download, Upload, Trash2, User, Info, FileJson } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { LogOut, Trash2, User, Info, Loader2 } from 'lucide-react';
 
-export function Settings({ user, setUser, exportData, importData }) {
-  const fileInputRef = useRef(null);
-
-  const handleImportClick = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleFileChange = (e) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const result = importData(event.target.result);
-        if (result) {
-          alert('Data imported successfully!');
-        } else {
-          alert('Failed to import data. Please check the file format.');
-        }
-      };
-      reader.readAsText(file);
-    }
-  };
+export function Settings({ profile, updateProfile }) {
+  const { signOut } = useAuth();
 
   const clearData = () => {
-    if (window.confirm('Are you sure you want to clear ALL data? This cannot be undone.')) {
-      window.localStorage.clear();
-      window.location.reload();
+    if (window.confirm('This will only log you out. To delete your cloud data, please contact support.')) {
+      signOut();
     }
   };
 
@@ -45,16 +24,16 @@ export function Settings({ user, setUser, exportData, importData }) {
         <div className="bg-card border border-border p-5 rounded-2xl space-y-4">
           <div className="flex justify-between items-center">
             <div>
-              <p className="font-medium">{user.name}</p>
-              <p className="text-sm text-muted-foreground">{user.weight} {user.units}</p>
+              <p className="font-medium">{profile?.name || 'Loading...'}</p>
+              <p className="text-sm text-muted-foreground">{profile?.weight} {profile?.units}</p>
             </div>
             <button 
               className="text-primary text-sm font-bold hover:underline"
               onClick={() => {
-                const name = prompt('Enter your name:', user.name);
-                const weight = prompt('Enter your weight:', user.weight);
+                const name = prompt('Enter your name:', profile?.name);
+                const weight = prompt('Enter your weight:', profile?.weight);
                 if (name && weight) {
-                  setUser({ ...user, name, weight });
+                  updateProfile({ name, weight });
                 }
               }}
             >
@@ -66,50 +45,20 @@ export function Settings({ user, setUser, exportData, importData }) {
 
       <section className="space-y-4">
         <h2 className="text-sm font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-          <FileJson className="w-4 h-4" />
-          Data Management
+          <LogOut className="w-4 h-4" />
+          Session
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <button
-            onClick={exportData}
-            className="flex items-center gap-4 bg-card border border-border p-5 rounded-2xl hover:bg-secondary transition-all text-left"
-          >
-            <div className="p-3 bg-blue-500/10 rounded-xl text-blue-500">
-              <Download className="w-6 h-6" />
-            </div>
-            <div>
-              <p className="font-bold">Export Data</p>
-              <p className="text-sm text-muted-foreground">Download your workout history as JSON.</p>
-            </div>
-          </button>
-
-          <button
-            onClick={handleImportClick}
-            className="flex items-center gap-4 bg-card border border-border p-5 rounded-2xl hover:bg-secondary transition-all text-left"
-          >
-            <div className="p-3 bg-purple-500/10 rounded-xl text-purple-500">
-              <Upload className="w-6 h-6" />
-            </div>
-            <div>
-              <p className="font-bold">Import Data</p>
-              <p className="text-sm text-muted-foreground">Upload a previous backup file.</p>
-            </div>
-          </button>
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleFileChange}
-            accept=".json"
-            className="hidden"
-          />
-        </div>
-
         <button
-          onClick={clearData}
-          className="w-full flex items-center justify-center gap-2 p-4 text-red-500 border border-red-500/20 bg-red-500/5 hover:bg-red-500/10 rounded-2xl transition-all font-bold mt-4"
+          onClick={() => signOut()}
+          className="w-full flex items-center gap-4 bg-card border border-border p-5 rounded-2xl hover:bg-secondary transition-all text-left"
         >
-          <Trash2 className="w-5 h-5" />
-          Delete All Data
+          <div className="p-3 bg-red-500/10 rounded-xl text-red-500">
+            <LogOut className="w-6 h-6" />
+          </div>
+          <div>
+            <p className="font-bold">Log Out</p>
+            <p className="text-sm text-muted-foreground">Sign out of your account on this device.</p>
+          </div>
         </button>
       </section>
 
@@ -120,9 +69,9 @@ export function Settings({ user, setUser, exportData, importData }) {
         </h2>
         <div className="bg-card border border-border p-5 rounded-2xl space-y-2">
           <p className="text-sm text-muted-foreground">
-            <span className="font-bold text-foreground">AlexosLifts</span> is a privacy-first workout tracker. Your data never leaves your device.
+            <span className="font-bold text-foreground">AlexosLifts Cloud</span> is now syncing your progress to the cloud.
           </p>
-          <p className="text-xs text-muted-foreground mt-4">Version 0.1.0 • Built with React & Tailwind</p>
+          <p className="text-xs text-muted-foreground mt-4">Version 1.0.0 • Supabase Backend</p>
         </div>
       </section>
     </div>

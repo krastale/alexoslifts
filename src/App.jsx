@@ -1,22 +1,24 @@
 import { useState, useEffect } from 'react';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { useData } from './hooks/useData';
-import { Layout, Home, Dumbbell, Settings as SettingsIcon, Plus } from 'lucide-react';
+import { Home, Dumbbell, Settings as SettingsIcon, Loader2 } from 'lucide-react';
 
+import { Auth } from './components/Auth';
 import { Onboarding } from './components/Onboarding';
 import { Dashboard } from './components/Dashboard';
 import { RoutineBuilder } from './components/RoutineBuilder';
 import { WorkoutLogger } from './components/WorkoutLogger';
 import { Settings } from './components/Settings';
 
-function App() {
+function AppContent() {
+  const { user, loading: authLoading } = useAuth();
   const { 
-    user, setUser, routines, addRoutine, deleteRoutine, history, addHistory, exportData, importData 
+    profile, updateProfile, routines, addRoutine, deleteRoutine, history, addHistory, loading: dataLoading 
   } = useData();
 
   const [activeTab, setActiveTab] = useState('dashboard');
   const [activeWorkout, setActiveWorkout] = useState(null);
 
-  // Listen for custom event to start workout from RoutineBuilder
   useEffect(() => {
     const handleStartWorkout = (e) => {
       setActiveWorkout(e.detail);
@@ -25,16 +27,28 @@ function App() {
     return () => window.removeEventListener('start-workout', handleStartWorkout);
   }, []);
 
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-10 h-10 text-primary animate-spin" />
+      </div>
+    );
+  }
+
   if (!user) {
-    return <Onboarding onComplete={setUser} />;
+    return <Auth />;
+  }
+
+  if (!profile && !dataLoading) {
+    return <Onboarding onComplete={updateProfile} />;
   }
 
   if (activeWorkout) {
     return (
       <WorkoutLogger 
         routine={activeWorkout} 
-        onSave={(workout) => {
-          addHistory(workout);
+        onSave={async (workout) => {
+          await addHistory(workout);
           setActiveWorkout(null);
           setActiveTab('dashboard');
         }} 
@@ -44,15 +58,23 @@ function App() {
   }
 
   const renderContent = () => {
+    if (dataLoading && !profile) {
+      return (
+        <div className="flex items-center justify-center h-screen">
+          <Loader2 className="w-8 h-8 text-primary animate-spin" />
+        </div>
+      );
+    }
+
     switch (activeTab) {
       case 'dashboard':
-        return <Dashboard user={user} history={history} />;
+        return <Dashboard profile={profile} history={history} />;
       case 'routines':
         return <RoutineBuilder routines={routines} addRoutine={addRoutine} deleteRoutine={deleteRoutine} />;
       case 'settings':
-        return <Settings user={user} setUser={setUser} exportData={exportData} importData={importData} />;
+        return <Settings profile={profile} updateProfile={updateProfile} />;
       default:
-        return <Dashboard user={user} history={history} />;
+        return <Dashboard profile={profile} history={history} />;
     }
   };
 
@@ -62,7 +84,6 @@ function App() {
         {renderContent()}
       </main>
 
-      {/* Navigation Bar */}
       <nav className="fixed bottom-0 left-0 right-0 bg-background/80 backdrop-blur-lg border-t border-border p-2 lg:sticky lg:top-0 lg:order-first lg:border-t-0 lg:border-b">
         <div className="max-w-md mx-auto lg:max-w-none flex justify-around items-center">
           <button
@@ -97,6 +118,14 @@ function App() {
         </div>
       </nav>
     </div>
+  );
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }
 

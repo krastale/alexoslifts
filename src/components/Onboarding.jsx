@@ -7,11 +7,14 @@ export function Onboarding({ onComplete }) {
     weight: '',
     units: 'kg'
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (formData.name && formData.weight) {
-      onComplete(formData);
+      setIsSubmitting(true);
+      await onComplete(formData);
+      setIsSubmitting(false);
     }
   };
 
@@ -89,9 +92,10 @@ export function Onboarding({ onComplete }) {
 
           <button
             type="submit"
-            className="w-full bg-primary hover:bg-primary/90 text-white font-bold py-3 rounded-lg shadow-lg shadow-primary/20 transition-all mt-4"
+            disabled={isSubmitting}
+            className="w-full bg-primary hover:bg-primary/90 text-white font-bold py-3 rounded-lg shadow-lg shadow-primary/20 transition-all mt-4 flex items-center justify-center gap-2"
           >
-            Start Lifting
+            {isSubmitting ? 'Creating Profile...' : 'Start Lifting'}
           </button>
         </form>
       </div>
