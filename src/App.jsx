@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { useData } from './hooks/useData';
-import { Home, Dumbbell, Settings as SettingsIcon, Loader2 } from 'lucide-react';
+import { Home, Dumbbell, Settings as SettingsIcon, Loader2, BarChart2 } from 'lucide-react';
 
 import { Auth } from './components/Auth';
 import { Onboarding } from './components/Onboarding';
@@ -9,11 +9,15 @@ import { Dashboard } from './components/Dashboard';
 import { RoutineBuilder } from './components/RoutineBuilder';
 import { WorkoutLogger } from './components/WorkoutLogger';
 import { Settings } from './components/Settings';
+import { Progress } from './components/Progress';
 
 function AppContent() {
   const { user, loading: authLoading } = useAuth();
   const { 
-    profile, updateProfile, routines, addRoutine, deleteRoutine, history, addHistory, loading: dataLoading 
+    profile, updateProfile, routines, addRoutine, deleteRoutine, 
+    history, addHistory, loading: dataLoading,
+    measurements, addMeasurement, deleteMeasurement,
+    photos, uploadPhoto, deletePhoto
   } = useData();
 
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -71,6 +75,19 @@ function AppContent() {
         return <Dashboard profile={profile} history={history} />;
       case 'routines':
         return <RoutineBuilder routines={routines} addRoutine={addRoutine} deleteRoutine={deleteRoutine} />;
+      case 'progress':
+        return (
+          <Progress 
+            profile={profile} 
+            history={history} 
+            measurements={measurements} 
+            addMeasurement={addMeasurement}
+            deleteMeasurement={deleteMeasurement}
+            photos={photos}
+            uploadPhoto={uploadPhoto}
+            deletePhoto={deletePhoto}
+          />
+        );
       case 'settings':
         return <Settings profile={profile} updateProfile={updateProfile} />;
       default:
@@ -104,6 +121,16 @@ function AppContent() {
           >
             <Dumbbell className="w-6 h-6" />
             <span className="text-[10px] font-bold mt-1 uppercase tracking-tighter">Routines</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('progress')}
+            className={`flex flex-col items-center p-2 rounded-xl transition-all ${
+              activeTab === 'progress' ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <BarChart2 className="w-6 h-6" />
+            <span className="text-[10px] font-bold mt-1 uppercase tracking-tighter">Progress</span>
           </button>
 
           <button

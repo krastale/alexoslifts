@@ -7,6 +7,8 @@ export function useData() {
   const [profile, setProfile] = useState(null);
   const [routines, setRoutines] = useState([]);
   const [history, setHistory] = useState([]);
+  const [measurements, setMeasurements] = useState([]);
+  const [photos, setPhotos] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
@@ -14,15 +16,29 @@ export function useData() {
     setLoading(true);
     
     try {
-      const [profileRes, routinesRes, historyRes] = await Promise.all([
+      const [profileRes, routinesRes, historyRes, measurementsRes, photosRes] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', user.id).single(),
         supabase.from('routines').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
-        supabase.from('history').select('*').eq('user_id', user.id).order('date', { ascending: false })
+        supabase.from('history').select('*').eq('user_id', user.id).order('date', { ascending: false }),
+        supabase.from('measurements').select('*').eq('user_id', user.id).order('date', { ascending: false }),
+        supabase.from('progress_photos').select('*').eq('user_id', user.id).order('date', { ascending: false })
       ]);
 
       if (profileRes.data) setProfile(profileRes.data);
       if (routinesRes.data) setRoutines(routinesRes.data);
       if (historyRes.data) setHistory(historyRes.data);
+      if (measurementsRes.data) setMeasurements(measurementsRes.data);
+      
+      if (photosRes.data) {
+        // Sign URLs for private photos
+        const photosWithUrls = await Promise.all(photosRes.data.map(async (p) => {
+          const { data } = await supabase.storage
+            .from('progress-photos')
+            .createSignedUrl(p.storage_path, 3600); // 1 hour link
+          return { ...p, url: data?.signedUrl };
+        }));
+        setPhotos(photosWithUrls);
+      }
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
@@ -83,6 +99,75 @@ export function useData() {
     return { data, error };
   };
 
+  const addMeasurement = async (measurement) => {
+    const { data, error } = await supabase
+      .from('measurements')
+      .insert([{ ...measurement, user_id: user.id }])
+      .select()
+      .single();
+    
+    if (data) setMeasurements([data, ...measurements]);
+    return { data, error };
+  };
+
+  const deleteMeasurement = async (id) => {
+    const { error } = await supabase.from('measurements').delete().eq('id', id);
+    if (!error) setMeasurements(measurements.filter(m => m.id !== id));
+    return { error };
+  };
+
+  const uploadPhoto = async (file, caption = '') => {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${Date.now()}.${fileExt}`;
+    const filePath = `${user.id}/${fileName}`;
+
+    // 1. Upload to Storage
+    const { error: uploadError } = await supabase.storage
+      .from('progress-photos')
+      .upload(filePath, file);
+
+    if (uploadError) return { error: uploadError };
+
+    // 2. Save metadata to DB
+    const { data, error: dbError } = await supabase
+      .from('progress_photos')
+      .insert([{
+        user_id: user.id,
+        storage_path: filePath,
+        caption
+      }])
+      .select()
+      .single();
+
+    if (dbError) return { error: dbError };
+
+    // 3. Update local state with signed URL
+    const { data: signedData } = await supabase.storage
+      .from('progress-photos')
+      .createSignedUrl(filePath, 3600);
+
+    setPhotos([{ ...data, url: signedData?.signedUrl }, ...photos]);
+    return { data, error: null };
+  };
+
+  const deletePhoto = async (photo) => {
+    // 1. Delete from Storage
+    const { error: storageError } = await supabase.storage
+      .from('progress-photos')
+      .remove([photo.storage_path]);
+
+    if (storageError) return { error: storageError };
+
+    // 2. Delete from DB
+    const { error: dbError } = await supabase
+      .from('progress_photos')
+      .delete()
+      .eq('id', photo.id);
+
+    if (!dbError) setPhotos(photos.filter(p => p.id !== photo.id));
+    return { error: dbError };
+  };
+
   return {
     profile,
     updateProfile,
@@ -91,6 +176,12 @@ export function useData() {
     deleteRoutine,
     history,
     addHistory,
+    measurements,
+    addMeasurement,
+    deleteMeasurement,
+    photos,
+    uploadPhoto,
+    deletePhoto,
     loading,
     refreshData: fetchData
   };
