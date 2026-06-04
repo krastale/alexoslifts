@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Activity, Mail, Lock, Loader2 } from 'lucide-react';
+import { Activity, Mail, Lock, Loader2, AlertCircle } from 'lucide-react';
 
 export function Auth() {
   const [email, setEmail] = useState('');
@@ -17,14 +17,30 @@ export function Auth() {
     setError(null);
     
     try {
-      const { error } = isSignUp 
+      console.log(`Attempting ${isSignUp ? 'SignUp' : 'SignIn'} for:`, email);
+      
+      const { data, error: authError } = isSignUp 
         ? await signUp(email, password) 
         : await signIn(email, password);
       
-      if (error) throw error;
-      if (isSignUp) alert('Check your email for the confirmation link!');
+      if (authError) {
+        console.error('Supabase Auth Error:', authError);
+        throw authError;
+      }
+      
+      console.log('Auth Success:', data);
+      if (isSignUp && data?.user && data?.session === null) {
+        alert('Registration successful! Please check your email to confirm your account before logging in.');
+      }
     } catch (err) {
-      setError(err.message);
+      console.error('Full Auth Exception:', err);
+      
+      // Handle the common "Load failed" or network error
+      if (err.message === 'Load failed' || err.name === 'TypeError') {
+        setError('Network Error: Could not connect to Supabase. This is usually caused by an ad-blocker, VPN, or a paused Supabase project.');
+      } else {
+        setError(err.message || 'An unexpected error occurred during authentication.');
+      }
     } finally {
       setLoading(false);
     }
@@ -46,8 +62,9 @@ export function Auth() {
 
         <form onSubmit={handleAuth} className="space-y-4">
           {error && (
-            <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-500 text-sm rounded-lg">
-              {error}
+            <div className="p-4 bg-red-500/10 border border-red-500/20 text-red-500 text-sm rounded-xl flex gap-3">
+              <AlertCircle className="w-5 h-5 shrink-0" />
+              <p>{error}</p>
             </div>
           )}
 
@@ -73,6 +90,7 @@ export function Auth() {
               <input
                 type="password"
                 required
+                minLength={6}
                 className="w-full bg-secondary border border-border rounded-lg py-2.5 pl-10 pr-4 focus:ring-2 focus:ring-primary outline-none transition-all"
                 placeholder="••••••••"
                 value={password}
@@ -84,7 +102,7 @@ export function Auth() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-primary hover:bg-primary/90 text-white font-bold py-3 rounded-lg shadow-lg shadow-primary/20 transition-all flex items-center justify-center gap-2"
+            className="w-full bg-primary hover:bg-primary/90 text-white font-bold py-3 rounded-lg shadow-lg shadow-primary/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
           >
             {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (isSignUp ? 'Sign Up' : 'Log In')}
           </button>
@@ -92,7 +110,10 @@ export function Auth() {
 
         <div className="mt-6 text-center">
           <button
-            onClick={() => setIsSignUp(!isSignUp)}
+            onClick={() => {
+              setIsSignUp(!isSignUp);
+              setError(null);
+            }}
             className="text-sm text-muted-foreground hover:text-primary transition-colors"
           >
             {isSignUp ? 'Already have an account? Log in' : "Don't have an account? Sign up"}
