@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import { Users, UserPlus, MessageCircle, Send, Trophy, Loader2, Check, X, Activity, Heart, Dumbbell } from 'lucide-react';
 
-export function Community({ profile }) {
+export function Community({ profile, addRoutine }) {
   const [activeTab, setActiveTab] = useState('feed'); // feed, friends, add, chat
   const [friends, setFriends] = useState([]);
   const [feed, setFeed] = useState([]);
@@ -19,6 +19,10 @@ export function Community({ profile }) {
   const [messageInput, setMessageInput] = useState('');
   const messagesEndRef = useRef(null);
 
+  // Friend Profile View
+  const [viewingFriendRoutines, setViewingFriendRoutines] = useState(null);
+  const [friendRoutines, setFriendRoutines] = useState([]);
+
   useEffect(() => {
     if (profile?.id) {
       fetchFriendsAndRequests();
@@ -31,6 +35,31 @@ export function Community({ profile }) {
       fetchFeed();
     }
   }, [friends]);
+
+  const fetchFriendRoutines = async (friend) => {
+    setLoading(true);
+    setViewingFriendRoutines(friend);
+    const { data } = await supabase
+      .from('routines')
+      .select('*')
+      .eq('user_id', friend.id)
+      .eq('is_public', true);
+    
+    setFriendRoutines(data || []);
+    setLoading(false);
+  };
+
+  const importRoutine = async (routine) => {
+    const { error } = await addRoutine({
+      name: routine.name,
+      exercises: routine.exercises,
+      is_public: routine.is_public
+    });
+    
+    if (!error) {
+      alert(`Imported "${routine.name}" to your routines!`);
+    }
+  };
 
   const fetchFeed = async () => {
     const friendIds = friends.map(f => f.id);
@@ -222,7 +251,7 @@ export function Community({ profile }) {
     <div className="flex flex-col h-[calc(100vh-80px)] lg:h-[calc(100vh-64px)] pb-24 lg:pb-0 bg-background">
       <header className="p-4 border-b border-border bg-background/80 backdrop-blur-md sticky top-0 z-10">
         <h1 className="text-xl font-bold mb-4">Community</h1>
-        {!activeChat ? (
+        {!activeChat && !viewingFriendRoutines ? (
           <div className="flex gap-2 p-1 bg-secondary/50 rounded-xl overflow-x-auto no-scrollbar">
             <button onClick={() => setActiveTab('feed')} className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-bold transition-all ${activeTab === 'feed' ? 'bg-primary text-white shadow-md' : 'text-muted-foreground'}`}>
               <Activity className="w-4 h-4" /> Feed
@@ -237,19 +266,20 @@ export function Community({ profile }) {
           </div>
         ) : (
           <div className="flex items-center gap-3">
-            <button onClick={() => setActiveChat(null)} className="text-muted-foreground hover:text-foreground">
+            <button onClick={() => { setActiveChat(null); setViewingFriendRoutines(null); }} className="text-muted-foreground hover:text-foreground">
               <X className="w-6 h-6" />
             </button>
             <div className="w-8 h-8 bg-secondary rounded-full flex items-center justify-center">
               <Users className="w-4 h-4 text-primary" />
             </div>
-            <h2 className="font-bold">{activeChat.username}</h2>
+            <h2 className="font-bold">{activeChat?.username || viewingFriendRoutines?.username}</h2>
           </div>
         )}
       </header>
 
       <div className="flex-1 overflow-y-auto">
-        {!activeChat && activeTab === 'feed' && (
+        {!activeChat && !viewingFriendRoutines && activeTab === 'feed' && (
+          // ... (rest of feed rendering is unchanged, I'll keep it simple in this call)
           <div className="p-4 space-y-6">
             {feed.length === 0 ? (
               <div className="text-center text-muted-foreground p-12 bg-secondary/20 rounded-3xl border border-dashed border-border space-y-4">
@@ -315,7 +345,7 @@ export function Community({ profile }) {
           </div>
         )}
 
-        {!activeChat && activeTab === 'friends' && (
+        {!activeChat && !viewingFriendRoutines && activeTab === 'friends' && (
           <div className="p-4 space-y-4">
             {friends.length === 0 ? (
               <div className="text-center text-muted-foreground p-8 bg-secondary/20 rounded-2xl border border-dashed border-border">
@@ -333,12 +363,22 @@ export function Community({ profile }) {
                       </div>
                       {friend.username}
                     </h3>
-                    <button 
-                      onClick={() => setActiveChat(friend)}
-                      className="bg-secondary p-2 rounded-lg text-primary hover:bg-secondary/80 transition-colors"
-                    >
-                      <MessageCircle className="w-5 h-5" />
-                    </button>
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={() => fetchFriendRoutines(friend)}
+                        className="bg-secondary p-2 rounded-lg text-primary hover:bg-secondary/80 transition-colors"
+                        title="View Routines"
+                      >
+                        <Dumbbell className="w-5 h-5" />
+                      </button>
+                      <button 
+                        onClick={() => setActiveChat(friend)}
+                        className="bg-secondary p-2 rounded-lg text-primary hover:bg-secondary/80 transition-colors"
+                        title="Send Message"
+                      >
+                        <MessageCircle className="w-5 h-5" />
+                      </button>
+                    </div>
                   </div>
                   
                   {/* Friend Scores */}
@@ -359,6 +399,51 @@ export function Community({ profile }) {
                   )}
                 </div>
               ))
+            )}
+          </div>
+        )}
+
+        {/* Friend Routines View */}
+        {viewingFriendRoutines && (
+          <div className="p-4 space-y-4">
+            <h3 className="text-sm font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+              <Globe className="w-4 h-4" />
+              Public Routines
+            </h3>
+            {loading ? (
+              <div className="flex justify-center py-12">
+                <Loader2 className="w-8 h-8 text-primary animate-spin" />
+              </div>
+            ) : friendRoutines.length === 0 ? (
+              <p className="text-center text-muted-foreground py-12">No public routines found.</p>
+            ) : (
+              <div className="grid grid-cols-1 gap-4">
+                {friendRoutines.map(routine => (
+                  <div key={routine.id} className="bg-card border border-border p-5 rounded-2xl space-y-4">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h4 className="font-bold text-lg">{routine.name}</h4>
+                        <p className="text-xs text-muted-foreground uppercase font-black">{routine.exercises.length} Exercises</p>
+                      </div>
+                      <button 
+                        onClick={() => importRoutine(routine)}
+                        className="bg-primary/10 text-primary p-2 rounded-xl hover:bg-primary/20 transition-colors"
+                        title="Import Routine"
+                      >
+                        <Download className="w-5 h-5" />
+                      </button>
+                    </div>
+                    <div className="space-y-1.5 border-t border-border/50 pt-3">
+                      {routine.exercises.slice(0, 3).map((ex, i) => (
+                        <div key={i} className="flex justify-between text-xs text-muted-foreground">
+                          <span>{ex.name}</span>
+                          <span>{ex.sets}x{ex.reps}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         )}

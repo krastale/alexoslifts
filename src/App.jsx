@@ -92,7 +92,7 @@ function AppContent() {
           />
         );
       case 'community':
-        return <Community profile={profile} />;
+        return <Community profile={profile} addRoutine={addRoutine} />;
       case 'settings':
         return <Settings profile={profile} updateProfile={updateProfile} />;
       default:
