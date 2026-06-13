@@ -1,16 +1,66 @@
-import { useState } from 'react';
-import { Plus, Trash2, Dumbbell, Save, X } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Plus, Trash2, Dumbbell, Save, X, Share2, Download, Library, User } from 'lucide-react';
 
 export const EXERCISE_CATEGORIES = [
   'arms', 'shoulders', 'abs', 'chest', 'back', 'legs', 'gluteus', 'forearms'
 ];
 
+const LIBRARY_ROUTINES = [
+  {
+    id: 'lib-1',
+    name: '3-Day Full Body',
+    exercises: [
+      { name: 'Barbell Squat', category: 'legs', sets: 3, reps: 8 },
+      { name: 'Bench Press', category: 'chest', sets: 3, reps: 8 },
+      { name: 'Barbell Row', category: 'back', sets: 3, reps: 8 },
+    ]
+  },
+  {
+    id: 'lib-2',
+    name: 'Push Day (PPL)',
+    exercises: [
+      { name: 'Overhead Press', category: 'shoulders', sets: 4, reps: 8 },
+      { name: 'Incline Dumbbell Press', category: 'chest', sets: 3, reps: 10 },
+      { name: 'Tricep Extension', category: 'arms', sets: 3, reps: 12 },
+    ]
+  },
+  {
+    id: 'lib-3',
+    name: 'The Arnold Split (Chest/Back)',
+    exercises: [
+      { name: 'Bench Press', category: 'chest', sets: 4, reps: 8 },
+      { name: 'Pullups', category: 'back', sets: 4, reps: 10 },
+      { name: 'Incline Flyes', category: 'chest', sets: 3, reps: 12 },
+      { name: 'T-Bar Row', category: 'back', sets: 3, reps: 10 },
+    ]
+  }
+];
+
 export function RoutineBuilder({ routines, addRoutine, deleteRoutine }) {
+  const [activeTab, setActiveTab] = useState('mine'); // 'mine' or 'library'
   const [isAdding, setIsAdding] = useState(false);
   const [newRoutine, setNewRoutine] = useState({
     name: '',
     exercises: [{ name: '', sets: 3, reps: 10, category: 'arms' }]
   });
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const shared = params.get('importRoutine');
+    if (shared) {
+      try {
+        const decoded = JSON.parse(atob(shared));
+        if (decoded && decoded.name && Array.isArray(decoded.exercises)) {
+          if (window.confirm(`Import routine "${decoded.name}"?`)) {
+            addRoutine(decoded);
+            window.history.replaceState({}, document.title, window.location.pathname);
+          }
+        }
+      } catch (e) {
+        console.error("Failed to parse shared routine", e);
+      }
+    }
+  }, [addRoutine]);
 
   const handleAddExercise = () => {
     setNewRoutine({
@@ -36,7 +86,23 @@ export function RoutineBuilder({ routines, addRoutine, deleteRoutine }) {
       addRoutine(newRoutine);
       setNewRoutine({ name: '', exercises: [{ name: '', sets: 3, reps: 10, category: 'arms' }] });
       setIsAdding(false);
+      setActiveTab('mine');
     }
+  };
+
+  const handleShare = (routine) => {
+    const routineData = { name: routine.name, exercises: routine.exercises };
+    const encoded = btoa(JSON.stringify(routineData));
+    const url = `${window.location.origin}${window.location.pathname}?importRoutine=${encoded}`;
+    navigator.clipboard.writeText(url).then(() => {
+      alert('Routine link copied to clipboard! Share it with your friends.');
+    });
+  };
+
+  const importLibraryRoutine = (routine) => {
+    const routineData = { name: routine.name, exercises: routine.exercises };
+    addRoutine(routineData);
+    setActiveTab('mine');
   };
 
   return (
@@ -53,6 +119,23 @@ export function RoutineBuilder({ routines, addRoutine, deleteRoutine }) {
           </button>
         )}
       </header>
+
+      {!isAdding && (
+        <div className="flex gap-2 p-1 bg-secondary/50 rounded-xl overflow-x-auto no-scrollbar w-full max-w-sm">
+          <button 
+            onClick={() => setActiveTab('mine')} 
+            className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-bold transition-all ${activeTab === 'mine' ? 'bg-primary text-white shadow-md' : 'text-muted-foreground'}`}
+          >
+            <User className="w-4 h-4" /> My Routines
+          </button>
+          <button 
+            onClick={() => setActiveTab('library')} 
+            className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-bold transition-all ${activeTab === 'library' ? 'bg-primary text-white shadow-md' : 'text-muted-foreground'}`}
+          >
+            <Library className="w-4 h-4" /> Library
+          </button>
+        </div>
+      )}
 
       {isAdding ? (
         <div className="bg-card border border-border p-6 rounded-2xl space-y-6">
@@ -151,7 +234,7 @@ export function RoutineBuilder({ routines, addRoutine, deleteRoutine }) {
             Save Routine
           </button>
         </div>
-      ) : (
+      ) : activeTab === 'mine' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {routines.map((routine) => (
             <div key={routine.id} className="bg-card border border-border p-5 rounded-2xl hover:border-primary/50 transition-all group">
@@ -160,12 +243,22 @@ export function RoutineBuilder({ routines, addRoutine, deleteRoutine }) {
                   <h3 className="text-xl font-bold">{routine.name}</h3>
                   <p className="text-muted-foreground text-sm">{routine.exercises.length} Exercises</p>
                 </div>
-                <button 
-                  onClick={() => deleteRoutine(routine.id)}
-                  className="text-muted-foreground hover:text-red-500 transition-colors"
-                >
-                  <Trash2 className="w-5 h-5" />
-                </button>
+                <div className="flex gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                  <button 
+                    onClick={() => handleShare(routine)}
+                    className="p-2 bg-secondary text-primary hover:bg-primary/20 rounded-lg transition-colors"
+                    title="Share Routine"
+                  >
+                    <Share2 className="w-4 h-4" />
+                  </button>
+                  <button 
+                    onClick={() => deleteRoutine(routine.id)}
+                    className="p-2 bg-secondary text-muted-foreground hover:bg-red-500/20 hover:text-red-500 rounded-lg transition-colors"
+                    title="Delete Routine"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
               
               <div className="space-y-2 mb-6">
@@ -189,7 +282,6 @@ export function RoutineBuilder({ routines, addRoutine, deleteRoutine }) {
               <button 
                 className="w-full py-2 bg-secondary group-hover:bg-primary/10 group-hover:text-primary rounded-lg font-bold transition-all text-sm"
                 onClick={() => {
-                  // This will be handled by the parent to start a workout
                   window.dispatchEvent(new CustomEvent('start-workout', { detail: routine }));
                 }}
               >
@@ -201,9 +293,47 @@ export function RoutineBuilder({ routines, addRoutine, deleteRoutine }) {
           {routines.length === 0 && (
             <div className="md:col-span-2 text-center py-12 bg-secondary/20 border-2 border-dashed border-border rounded-2xl">
               <Dumbbell className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground">No routines yet. Create your first one to get started!</p>
+              <p className="text-muted-foreground">No routines yet. Check the Library or create your first one!</p>
             </div>
           )}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {LIBRARY_ROUTINES.map((routine) => (
+            <div key={routine.id} className="bg-card border border-border p-5 rounded-2xl hover:border-primary/50 transition-all group">
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <h3 className="text-xl font-bold">{routine.name}</h3>
+                  <p className="text-muted-foreground text-sm">{routine.exercises.length} Exercises</p>
+                </div>
+                <button 
+                  onClick={() => importLibraryRoutine(routine)}
+                  className="p-2 bg-secondary text-primary hover:bg-primary/20 rounded-lg transition-colors"
+                  title="Import Routine"
+                >
+                  <Download className="w-5 h-5" />
+                </button>
+              </div>
+              
+              <div className="space-y-2 mb-6">
+                {routine.exercises.slice(0, 3).map((ex, i) => (
+                  <div key={i} className="text-sm flex justify-between items-center text-muted-foreground">
+                    <div className="flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-primary/40"></span>
+                      <span>{ex.name}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 bg-secondary rounded text-muted-foreground/70">{ex.category || 'arms'}</span>
+                      <span>{ex.sets}x{ex.reps}</span>
+                    </div>
+                  </div>
+                ))}
+                {routine.exercises.length > 3 && (
+                  <p className="text-xs text-muted-foreground italic">+{routine.exercises.length - 3} more...</p>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>

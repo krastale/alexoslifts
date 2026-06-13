@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
-import { Users, UserPlus, MessageCircle, Send, Trophy, Loader2, Check, X } from 'lucide-react';
+import { Users, UserPlus, MessageCircle, Send, Trophy, Loader2, Check, X, Activity, Heart, Dumbbell } from 'lucide-react';
 
 export function Community({ profile }) {
-  const [activeTab, setActiveTab] = useState('friends'); // friends, add, chat
+  const [activeTab, setActiveTab] = useState('feed'); // feed, friends, add, chat
   const [friends, setFriends] = useState([]);
+  const [feed, setFeed] = useState([]);
+  const [feedInteractions, setFeedInteractions] = useState([]);
   const [pendingRequests, setPendingRequests] = useState([]);
   const [friendScores, setFriendScores] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
@@ -26,8 +28,51 @@ export function Community({ profile }) {
   useEffect(() => {
     if (friends.length > 0) {
       fetchFriendScores();
+      fetchFeed();
     }
   }, [friends]);
+
+  const fetchFeed = async () => {
+    const friendIds = friends.map(f => f.id);
+    const { data } = await supabase
+      .from('history')
+      .select('*')
+      .in('user_id', friendIds)
+      .order('date', { ascending: false })
+      .limit(30);
+    
+    if (data) {
+      const feedWithProfiles = data.map(item => {
+        const friend = friends.find(f => f.id === item.user_id);
+        return { ...item, profile: friend };
+      });
+      setFeed(feedWithProfiles);
+      
+      const { data: interactionData } = await supabase
+        .from('messages')
+        .select('*')
+        .like('content', 'FEED_LIKE:%');
+        
+      if (interactionData) {
+        setFeedInteractions(interactionData);
+      }
+    }
+  };
+
+  const handleClap = async (historyItem) => {
+    const alreadyClapped = feedInteractions.find(m => m.sender_id === profile.id && m.content === `FEED_LIKE:${historyItem.id}`);
+    if (alreadyClapped) return;
+
+    const newClap = {
+      sender_id: profile.id,
+      receiver_id: historyItem.user_id,
+      content: `FEED_LIKE:${historyItem.id}`,
+      created_at: new Date().toISOString()
+    };
+    
+    setFeedInteractions(prev => [...prev, newClap]);
+    await supabase.from('messages').insert([newClap]);
+  };
 
   // Real-time chat subscription
   useEffect(() => {
@@ -179,6 +224,9 @@ export function Community({ profile }) {
         <h1 className="text-xl font-bold mb-4">Community</h1>
         {!activeChat ? (
           <div className="flex gap-2 p-1 bg-secondary/50 rounded-xl overflow-x-auto no-scrollbar">
+            <button onClick={() => setActiveTab('feed')} className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-bold transition-all ${activeTab === 'feed' ? 'bg-primary text-white shadow-md' : 'text-muted-foreground'}`}>
+              <Activity className="w-4 h-4" /> Feed
+            </button>
             <button onClick={() => setActiveTab('friends')} className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-bold transition-all ${activeTab === 'friends' ? 'bg-primary text-white shadow-md' : 'text-muted-foreground'}`}>
               <Users className="w-4 h-4" /> Friends
             </button>
@@ -201,6 +249,72 @@ export function Community({ profile }) {
       </header>
 
       <div className="flex-1 overflow-y-auto">
+        {!activeChat && activeTab === 'feed' && (
+          <div className="p-4 space-y-6">
+            {feed.length === 0 ? (
+              <div className="text-center text-muted-foreground p-12 bg-secondary/20 rounded-3xl border border-dashed border-border space-y-4">
+                <Activity className="w-10 h-10 mx-auto text-primary/50" />
+                <p className="text-sm">Your feed is quiet.<br/>Add friends to see their workouts!</p>
+                <button onClick={() => setActiveTab('add')} className="text-primary font-bold hover:underline">Find Friends</button>
+              </div>
+            ) : (
+              feed.map(item => {
+                const totalVolume = Math.round(item.exercises?.reduce((acc, ex) => 
+                  acc + (ex.sets?.reduce((sAcc, set) => sAcc + (parseFloat(set.weight) * parseInt(set.reps) || 0), 0) || 0)
+                , 0) || 0);
+                
+                const claps = feedInteractions.filter(m => m.content === `FEED_LIKE:${item.id}`);
+                const hasClapped = claps.some(m => m.sender_id === profile.id);
+
+                return (
+                  <div key={item.id} className="bg-card border border-border p-5 rounded-3xl space-y-4 shadow-sm hover:border-primary/50 transition-colors">
+                    <div className="flex justify-between items-start">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-primary/20 rounded-full flex items-center justify-center text-primary font-bold">
+                          {item.profile?.username?.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <h3 className="font-bold">{item.profile?.username}</h3>
+                          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                            {new Date(item.date).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="p-2 bg-secondary rounded-xl text-primary">
+                        <Dumbbell className="w-4 h-4" />
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-1">
+                      <p className="font-black text-lg tracking-tight uppercase">{item.routine_name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        Crushed {item.exercises?.length || 0} exercises, lifting a total of <span className="font-bold text-foreground">{totalVolume.toLocaleString()} {profile?.units}</span>.
+                      </p>
+                    </div>
+
+                    <div className="pt-2 border-t border-border flex gap-4">
+                      <button 
+                        onClick={() => handleClap(item)}
+                        className={`flex items-center gap-2 text-xs font-bold transition-all ${hasClapped ? 'text-red-500' : 'text-muted-foreground hover:text-red-400'}`}
+                      >
+                        <Heart className={`w-4 h-4 ${hasClapped ? 'fill-red-500' : ''}`} />
+                        {claps.length} {claps.length === 1 ? 'Clap' : 'Claps'}
+                      </button>
+                      <button 
+                        onClick={() => setActiveChat(item.profile)}
+                        className="flex items-center gap-2 text-xs font-bold text-muted-foreground hover:text-primary transition-colors"
+                      >
+                        <MessageCircle className="w-4 h-4" />
+                        Comment
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        )}
+
         {!activeChat && activeTab === 'friends' && (
           <div className="p-4 space-y-4">
             {friends.length === 0 ? (

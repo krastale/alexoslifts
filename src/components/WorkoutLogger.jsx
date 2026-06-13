@@ -83,7 +83,7 @@ export function WorkoutLogger({ routine, history, onSave, onCancel }) {
     exercises: routine.exercises.map(ex => ({
       name: ex.name,
       category: ex.category || 'arms',
-      sets: Array.from({ length: ex.sets }, () => ({ weight: '', reps: ex.reps, completed: false }))
+      sets: Array.from({ length: ex.sets }, () => ({ weight: '', reps: ex.reps, rpe: '', completed: false }))
     }))
   });
 
@@ -97,8 +97,8 @@ export function WorkoutLogger({ routine, history, onSave, onCancel }) {
   const personalBests = useMemo(() => {
     const bests = {};
     history?.forEach(session => {
-      session.exercises.forEach(ex => {
-        ex.sets.forEach(set => {
+      session.exercises?.forEach(ex => {
+        ex.sets?.forEach(set => {
           const w = parseFloat(set.weight);
           if (w > (bests[ex.name] || 0)) {
             bests[ex.name] = w;
@@ -107,6 +107,24 @@ export function WorkoutLogger({ routine, history, onSave, onCancel }) {
       });
     });
     return bests;
+  }, [history]);
+
+  // Last Performance Logic
+  const lastPerformances = useMemo(() => {
+    const last = {};
+    if (!history) return last;
+    
+    // Sort history by date descending just in case
+    const sortedHistory = [...history].sort((a, b) => new Date(b.date) - new Date(a.date));
+    
+    sortedHistory.forEach(session => {
+      session.exercises?.forEach(ex => {
+        if (!last[ex.name]) {
+          last[ex.name] = ex.sets;
+        }
+      });
+    });
+    return last;
   }, [history]);
 
   useEffect(() => {
@@ -241,14 +259,36 @@ export function WorkoutLogger({ routine, history, onSave, onCancel }) {
               <div className="space-y-2">
                 <div className="grid grid-cols-12 gap-2 px-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
                   <div className="col-span-1 text-center">#</div>
-                  <div className="col-span-3 text-center">1RM Est</div>
-                  <div className="col-span-3 text-center">Weight</div>
+                  <div className="col-span-4 text-center">Weight</div>
                   <div className="col-span-3 text-center">Reps</div>
+                  <div className="col-span-2 text-center">RPE</div>
                   <div className="col-span-2 text-center">Done</div>
                 </div>
 
                 {ex.sets.map((set, setIdx) => {
-                  const est1RM = calculate1RM(parseFloat(set.weight), parseInt(set.reps));
+                  const lastSetData = lastPerformances[ex.name]?.[setIdx];
+                  
+                  // Intelligent Progression Logic
+                  let placeholderWeight = "0";
+                  let targetSubtext = null;
+                  
+                  if (lastSetData) {
+                    const lastWeight = parseFloat(lastSetData.weight) || 0;
+                    const lastReps = parseInt(lastSetData.reps) || 0;
+                    const lastRpe = parseInt(lastSetData.rpe) || 10;
+                    
+                    if (lastWeight > 0) {
+                      // If they hit the target reps and it wasn't max effort, suggest a small bump
+                      if (lastReps >= set.reps && lastRpe < 9) {
+                        placeholderWeight = `${lastWeight + 2.5}`;
+                        targetSubtext = "Target";
+                      } else {
+                        placeholderWeight = `${lastWeight}`;
+                        targetSubtext = "Last";
+                      }
+                    }
+                  }
+
                   return (
                     <div 
                       key={setIdx} 
@@ -259,19 +299,19 @@ export function WorkoutLogger({ routine, history, onSave, onCancel }) {
                       <div className="col-span-1 text-center font-bold text-sm">
                         {setIdx + 1}
                       </div>
-                      <div className="col-span-3 text-center">
-                        <span className="text-[10px] font-mono text-muted-foreground">
-                          {est1RM > 0 ? `${est1RM.toFixed(1)}kg` : '-'}
-                        </span>
-                      </div>
-                      <div className="col-span-3 relative group">
+                      <div className="col-span-4 relative group">
                         <input
                           type="number"
-                          placeholder="0"
+                          placeholder={placeholderWeight}
                           className="w-full bg-secondary border border-border rounded-xl py-2.5 text-center text-sm font-bold outline-none focus:ring-2 focus:ring-primary"
                           value={set.weight}
                           onChange={(e) => updateSet(exIdx, setIdx, 'weight', e.target.value)}
                         />
+                        {targetSubtext && !set.weight && (
+                          <span className="absolute -top-1.5 left-1/2 -translate-x-1/2 bg-background px-1 text-[8px] font-bold text-primary uppercase whitespace-nowrap rounded">
+                            {targetSubtext}
+                          </span>
+                        )}
                         <button 
                           onClick={() => setShowPlateCalc(parseFloat(set.weight) || 0)}
                           className="absolute -top-2 -right-1 bg-background border border-border p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
@@ -279,14 +319,27 @@ export function WorkoutLogger({ routine, history, onSave, onCancel }) {
                           <Calculator className="w-3 h-3 text-primary" />
                         </button>
                       </div>
-                      <div className="col-span-3">
+                      <div className="col-span-3 relative">
                         <input
                           type="number"
-                          placeholder="0"
+                          placeholder={lastSetData ? `${lastSetData.reps}` : "0"}
                           className="w-full bg-secondary border border-border rounded-xl py-2.5 text-center text-sm font-bold outline-none focus:ring-2 focus:ring-primary"
                           value={set.reps}
                           onChange={(e) => updateSet(exIdx, setIdx, 'reps', e.target.value)}
                         />
+                      </div>
+                      <div className="col-span-2 relative group">
+                        <input
+                          type="number"
+                          min="1" max="10"
+                          placeholder="-"
+                          className="w-full bg-secondary border border-border rounded-xl py-2.5 text-center text-sm font-bold outline-none focus:ring-2 focus:ring-primary"
+                          value={set.rpe || ''}
+                          onChange={(e) => updateSet(exIdx, setIdx, 'rpe', e.target.value)}
+                        />
+                        <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-card border border-border text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-10 transition-opacity shadow-xl">
+                          RPE (1-10)
+                        </div>
                       </div>
                       <div className="col-span-2 flex justify-center relative">
                         {set.isPR && (
