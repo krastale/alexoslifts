@@ -1,12 +1,12 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { Send, Bot, User, Sparkles, AlertCircle, Dumbbell, Activity, Utensils, Save, CheckCircle2 } from 'lucide-react';
-
-// Initialize Gemini if key exists
-const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
+import { Send, Bot, User, Sparkles, AlertCircle, Dumbbell, Activity, Utensils, Save, CheckCircle2, Settings } from 'lucide-react';
 
 export function AICoach({ profile, addRoutine }) {
+  // Use user's custom key if available, fallback to environment variable
+  const activeApiKey = profile?.ai_api_key || import.meta.env.VITE_GEMINI_API_KEY;
+  const genAI = activeApiKey ? new GoogleGenerativeAI(activeApiKey) : null;
+
   const [messages, setMessages] = useState([
     {
       role: 'assistant',
@@ -47,8 +47,12 @@ export function AICoach({ profile, addRoutine }) {
   const handleSend = async (text = input) => {
     if (!text.trim()) return;
     
-    if (!genAI) {
-      alert("Please add your VITE_GEMINI_API_KEY to your .env.local file to use the AI Coach.");
+    if (!activeApiKey) {
+      setMessages(prev => [...prev, { role: 'user', content: text }, { 
+        role: 'assistant', 
+        content: "I need an API key to help you. Please go to **Settings** and add your free Gemini API key from Google AI Studio." 
+      }]);
+      setInput('');
       return;
     }
 
@@ -60,6 +64,8 @@ export function AICoach({ profile, addRoutine }) {
     setIsSaved(false);
 
     try {
+      if (!genAI) throw new Error("AI not initialized");
+      
       const model = genAI.getGenerativeModel({ 
         model: "gemini-1.5-flash",
         systemInstruction: `You are a professional, encouraging fitness coach. Keep answers concise and practical. 
@@ -96,10 +102,14 @@ export function AICoach({ profile, addRoutine }) {
       setMessages([...newMessages, { role: 'assistant', content: responseText }]);
     } catch (error) {
       console.error('Gemini API Error:', error);
-      let errorMsg = 'Oops! I had trouble connecting. Please check your API key or internet connection.';
-      if (error.message?.includes('API_KEY_INVALID')) {
-        errorMsg = 'Your Gemini API key seems to be invalid. Please double-check it in your .env.local file.';
+      let errorMsg = `Error: ${error.message || 'I had trouble connecting. Please check your API key or internet connection.'}`;
+      
+      if (error.message?.includes('API_KEY_INVALID') || error.message?.includes('invalid')) {
+        errorMsg = 'Your Gemini API key seems to be invalid. Please go to **Settings** and update it with a fresh key from Google AI Studio.';
+      } else if (error.message?.includes('API key not found')) {
+        errorMsg = 'API Key not found. Please ensure your key is correctly set in **Settings**.';
       }
+      
       setMessages([...newMessages, { role: 'assistant', content: errorMsg }]);
     } finally {
       setIsLoading(false);
@@ -133,11 +143,11 @@ export function AICoach({ profile, addRoutine }) {
         </div>
       </header>
 
-      {!apiKey && (
-        <div className="m-4 p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-red-500 shrink-0" />
-          <p className="text-sm text-red-500">
-            <strong>Missing API Key:</strong> Add <code className="bg-black/20 px-1 rounded">VITE_GEMINI_API_KEY</code> to your <code className="bg-black/20 px-1 rounded">.env.local</code> file to enable the AI Coach.
+      {!activeApiKey && (
+        <div className="m-4 p-4 bg-primary/10 border border-primary/20 rounded-xl flex items-start gap-3 animate-pulse">
+          <Settings className="w-5 h-5 text-primary shrink-0" />
+          <p className="text-sm text-primary">
+            <strong>Ready to start?</strong> Go to **Settings** and paste your free Google Gemini API key to enable your personal fitness coach!
           </p>
         </div>
       )}
@@ -152,7 +162,7 @@ export function AICoach({ profile, addRoutine }) {
               {m.content.split('\n').map((line, i) => {
                 if (line.startsWith('```json') || line.startsWith('```')) return null;
                 if (line.trim() === '}' || (line.trim().startsWith('{') && line.includes('"name"'))) return null;
-                return <p key={i} className="mb-2 last:mb-0 min-h-[1em]">{line}</p>;
+                return <p key={i} className="mb-2 last:mb-0 min-h-[1em] whitespace-pre-wrap">{line}</p>;
               })}
               
               {idx === messages.length - 1 && proposedRoutine && (
@@ -226,12 +236,12 @@ export function AICoach({ profile, addRoutine }) {
             onChange={(e) => setInput(e.target.value)}
             placeholder="Ask your coach for a routine..."
             className="flex-1 bg-secondary border border-border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-primary text-sm"
-            disabled={isLoading || !apiKey}
+            disabled={isLoading}
           />
           <button
             type="submit"
-            disabled={isLoading || !input.trim() || !apiKey}
-            className="bg-primary text-white p-3 rounded-xl hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={isLoading || !input.trim()}
+            className="bg-primary text-white p-3 rounded-xl hover:bg-primary/90 transition-colors disabled:opacity-50"
           >
             <Send className="w-5 h-5" />
           </button>
@@ -240,3 +250,4 @@ export function AICoach({ profile, addRoutine }) {
     </div>
   );
 }
+
