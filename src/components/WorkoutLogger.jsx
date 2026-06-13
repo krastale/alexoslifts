@@ -82,6 +82,7 @@ export function WorkoutLogger({ routine, history, onSave, onCancel }) {
     date: new Date().toISOString(),
     exercises: routine.exercises.map(ex => ({
       name: ex.name,
+      category: ex.category || 'arms',
       sets: Array.from({ length: ex.sets }, () => ({ weight: '', reps: ex.reps, completed: false }))
     }))
   });

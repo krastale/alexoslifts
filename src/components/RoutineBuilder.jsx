@@ -1,17 +1,21 @@
 import { useState } from 'react';
 import { Plus, Trash2, Dumbbell, Save, X } from 'lucide-react';
 
+export const EXERCISE_CATEGORIES = [
+  'arms', 'shoulders', 'abs', 'chest', 'back', 'legs', 'gluteus', 'forearms'
+];
+
 export function RoutineBuilder({ routines, addRoutine, deleteRoutine }) {
   const [isAdding, setIsAdding] = useState(false);
   const [newRoutine, setNewRoutine] = useState({
     name: '',
-    exercises: [{ name: '', sets: 3, reps: 10 }]
+    exercises: [{ name: '', sets: 3, reps: 10, category: 'arms' }]
   });
 
   const handleAddExercise = () => {
     setNewRoutine({
       ...newRoutine,
-      exercises: [...newRoutine.exercises, { name: '', sets: 3, reps: 10 }]
+      exercises: [...newRoutine.exercises, { name: '', sets: 3, reps: 10, category: 'arms' }]
     });
   };
 
@@ -30,7 +34,7 @@ export function RoutineBuilder({ routines, addRoutine, deleteRoutine }) {
   const handleSave = () => {
     if (newRoutine.name && newRoutine.exercises.every(ex => ex.name)) {
       addRoutine(newRoutine);
-      setNewRoutine({ name: '', exercises: [{ name: '', sets: 3, reps: 10 }] });
+      setNewRoutine({ name: '', exercises: [{ name: '', sets: 3, reps: 10, category: 'arms' }] });
       setIsAdding(false);
     }
   };
@@ -84,6 +88,7 @@ export function RoutineBuilder({ routines, addRoutine, deleteRoutine }) {
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="md:col-span-2">
+                      <label className="block text-xs text-muted-foreground mb-1">Exercise Name</label>
                       <input
                         type="text"
                         className="w-full bg-secondary border border-border rounded-lg py-2 px-3 outline-none focus:ring-1 focus:ring-primary"
@@ -93,22 +98,36 @@ export function RoutineBuilder({ routines, addRoutine, deleteRoutine }) {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs text-muted-foreground mb-1">Sets</label>
-                      <input
-                        type="number"
-                        className="w-full bg-secondary border border-border rounded-lg py-2 px-3 outline-none focus:ring-1 focus:ring-primary"
-                        value={ex.sets}
-                        onChange={(e) => handleExerciseChange(idx, 'sets', parseInt(e.target.value))}
-                      />
+                      <label className="block text-xs text-muted-foreground mb-1">Category</label>
+                      <select
+                        className="w-full bg-secondary border border-border rounded-lg py-2 px-3 outline-none focus:ring-1 focus:ring-primary appearance-none capitalize"
+                        value={ex.category}
+                        onChange={(e) => handleExerciseChange(idx, 'category', e.target.value)}
+                      >
+                        {EXERCISE_CATEGORIES.map(cat => (
+                          <option key={cat} value={cat}>{cat}</option>
+                        ))}
+                      </select>
                     </div>
-                    <div>
-                      <label className="block text-xs text-muted-foreground mb-1">Reps</label>
-                      <input
-                        type="number"
-                        className="w-full bg-secondary border border-border rounded-lg py-2 px-3 outline-none focus:ring-1 focus:ring-primary"
-                        value={ex.reps}
-                        onChange={(e) => handleExerciseChange(idx, 'reps', parseInt(e.target.value))}
-                      />
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs text-muted-foreground mb-1">Sets</label>
+                        <input
+                          type="number"
+                          className="w-full bg-secondary border border-border rounded-lg py-2 px-3 outline-none focus:ring-1 focus:ring-primary"
+                          value={ex.sets}
+                          onChange={(e) => handleExerciseChange(idx, 'sets', parseInt(e.target.value))}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-muted-foreground mb-1">Reps</label>
+                        <input
+                          type="number"
+                          className="w-full bg-secondary border border-border rounded-lg py-2 px-3 outline-none focus:ring-1 focus:ring-primary"
+                          value={ex.reps}
+                          onChange={(e) => handleExerciseChange(idx, 'reps', parseInt(e.target.value))}
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -151,9 +170,15 @@ export function RoutineBuilder({ routines, addRoutine, deleteRoutine }) {
               
               <div className="space-y-2 mb-6">
                 {routine.exercises.slice(0, 3).map((ex, i) => (
-                  <div key={i} className="text-sm flex justify-between text-muted-foreground">
-                    <span>{ex.name}</span>
-                    <span>{ex.sets}x{ex.reps}</span>
+                  <div key={i} className="text-sm flex justify-between items-center text-muted-foreground">
+                    <div className="flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-primary/40"></span>
+                      <span>{ex.name}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 bg-secondary rounded text-muted-foreground/70">{ex.category || 'arms'}</span>
+                      <span>{ex.sets}x{ex.reps}</span>
+                    </div>
                   </div>
                 ))}
                 {routine.exercises.length > 3 && (

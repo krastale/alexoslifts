@@ -5,22 +5,26 @@ import {
 import { Trophy, Flame, Dumbbell, TrendingUp, Activity, PieChart as PieIcon } from 'lucide-react';
 
 const MUSCLE_COLORS = {
-  'Chest': '#3b82f6',
-  'Back': '#10b981',
-  'Legs': '#f59e0b',
-  'Shoulders': '#8b5cf6',
-  'Arms': '#ef4444',
-  'Other': '#71717a'
+  'chest': '#3b82f6',
+  'back': '#10b981',
+  'legs': '#f59e0b',
+  'shoulders': '#8b5cf6',
+  'arms': '#ef4444',
+  'abs': '#06b6d4',
+  'gluteus': '#d946ef',
+  'forearms': '#84cc16',
+  'other': '#71717a'
 };
 
 const identifyMuscleGroup = (name = '') => {
   const n = name.toLowerCase();
-  if (n.includes('bench') || n.includes('chest') || n.includes('fly') || n.includes('pushup')) return 'Chest';
-  if (n.includes('row') || n.includes('pullup') || n.includes('pulldown') || n.includes('back') || n.includes('deadlift')) return 'Back';
-  if (n.includes('squat') || n.includes('lunge') || n.includes('leg') || n.includes('glute') || n.includes('calf') || n.includes('thigh')) return 'Legs';
-  if (n.includes('press') || n.includes('shoulder') || n.includes('lateral') || n.includes('deltoid')) return 'Shoulders';
-  if (n.includes('curl') || n.includes('tricep') || n.includes('bicep') || n.includes('arm') || n.includes('extension')) return 'Arms';
-  return 'Other';
+  if (n.includes('bench') || n.includes('chest') || n.includes('fly') || n.includes('pushup')) return 'chest';
+  if (n.includes('row') || n.includes('pullup') || n.includes('pulldown') || n.includes('back') || n.includes('deadlift')) return 'back';
+  if (n.includes('squat') || n.includes('lunge') || n.includes('leg') || n.includes('glute') || n.includes('calf') || n.includes('thigh')) return 'legs';
+  if (n.includes('press') || n.includes('shoulder') || n.includes('lateral') || n.includes('deltoid')) return 'shoulders';
+  if (n.includes('curl') || n.includes('tricep') || n.includes('bicep') || n.includes('arm') || n.includes('extension')) return 'arms';
+  if (n.includes('abs') || n.includes('crunch') || n.includes('plank') || n.includes('core')) return 'abs';
+  return 'other';
 };
 
 export function Dashboard({ profile, history }) {
@@ -32,7 +36,7 @@ export function Dashboard({ profile, history }) {
 
     history.forEach(workout => {
       workout.exercises?.forEach(ex => {
-        const group = identifyMuscleGroup(ex.name);
+        const group = ex.category || identifyMuscleGroup(ex.name);
         const volume = ex.sets?.reduce((acc, set) => acc + (parseFloat(set.weight) * parseInt(set.reps) || 0), 0) || 0;
         
         muscleSplit[group] = (muscleSplit[group] || 0) + volume;
