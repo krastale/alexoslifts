@@ -39,9 +39,16 @@ export const AuthProvider = ({ children }) => {
   const signUp = (email, password) => supabase.auth.signUp({ email, password });
   const signIn = (email, password) => supabase.auth.signInWithPassword({ email, password });
   const signOut = () => supabase.auth.signOut();
-  const resetPassword = (email) => supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${window.location.origin}${window.location.pathname}`,
-  });
+  const resetPassword = (email) => {
+    // Determine the redirect URL. If on GitHub Pages, use the full URL.
+    const redirectUrl = window.location.origin.includes('localhost') 
+      ? window.location.origin 
+      : 'https://alexkrastenov.github.io/alexoslifts/';
+      
+    return supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: redirectUrl,
+    });
+  };
   const updatePassword = (newPassword) => supabase.auth.updateUser({ password: newPassword });
 
   return (
