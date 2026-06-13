@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import { Play, RotateCcw, Trophy, Target, Zap, Grid3X3 } from 'lucide-react';
 
-function ReactionGame({ onScore }) {
+const ReactionGame = React.memo(({ onScore }) => {
   const [gameState, setGameState] = useState('idle'); // idle, waiting, ready, done
   const [startTime, setStartTime] = useState(0);
   const [result, setResult] = useState(null);
@@ -54,28 +54,31 @@ function ReactionGame({ onScore }) {
       {gameState === 'done' && <span className="text-xs opacity-70 mt-1">Tap to retry</span>}
     </div>
   );
-}
+});
 
-function TapGame({ onScore }) {
+const TapGame = React.memo(({ onScore }) => {
   const [gameState, setGameState] = useState('idle'); // idle, playing, done
   const [taps, setTaps] = useState(0);
   const [timeLeft, setTimeLeft] = useState(10);
+  const timerRef = useRef(null);
 
   useEffect(() => {
-    let timer;
     if (gameState === 'playing' && timeLeft > 0) {
-      timer = setInterval(() => {
+      timerRef.current = setInterval(() => {
         setTimeLeft(t => t - 1);
       }, 1000);
     } else if (timeLeft === 0 && gameState === 'playing') {
       setGameState('done');
       onScore(taps);
+      if (timerRef.current) clearInterval(timerRef.current);
     }
-    return () => clearInterval(timer);
-  }, [gameState, timeLeft, taps, onScore]);
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [gameState, timeLeft === 0]); // Minimal dependencies
 
   const handleTap = (e) => {
-    e.stopPropagation(); // Prevent bubbling if needed
+    e.stopPropagation();
     if (gameState === 'idle') {
       setTaps(1);
       setTimeLeft(10);
@@ -103,10 +106,9 @@ function TapGame({ onScore }) {
       </span>
     </div>
   );
-}
+});
 
-// Simple 2048-style game (target 128)
-function Game128({ onScore }) {
+const Game128 = React.memo(({ onScore }) => {
   const [grid, setGrid] = useState([]);
   const [score, setScore] = useState(0);
   const [gameOver, setGameOver] = useState(false);
@@ -135,45 +137,48 @@ function Game128({ onScore }) {
     return newG;
   }
 
-  const move = (dir) => {
+  const move = useCallback((dir) => {
     if (gameOver || won) return;
-    let newGrid = [...grid];
-    let moved = false;
+    setGrid(prevGrid => {
+      let newGrid = [...prevGrid];
+      let moved = false;
 
-    const getLine = (i, d) => {
-      if (d === 'left') return [i*4, i*4+1, i*4+2, i*4+3];
-      if (d === 'right') return [i*4+3, i*4+2, i*4+1, i*4];
-      if (d === 'up') return [i, i+4, i+8, i+12];
-      if (d === 'down') return [i+12, i+8, i+4, i];
-    };
+      const getLine = (i, d) => {
+        if (d === 'left') return [i*4, i*4+1, i*4+2, i*4+3];
+        if (d === 'right') return [i*4+3, i*4+2, i*4+1, i*4];
+        if (d === 'up') return [i, i+4, i+8, i+12];
+        if (d === 'down') return [i+12, i+8, i+4, i];
+      };
 
-    for (let i = 0; i < 4; i++) {
-      const lineIndices = getLine(i, dir);
-      let line = lineIndices.map(idx => newGrid[idx]).filter(v => v !== 0);
-      
-      for (let j = 0; j < line.length - 1; j++) {
-        if (line[j] === line[j+1]) {
-          line[j] *= 2;
-          setScore(s => s + line[j]);
-          if (line[j] === 128) setWon(true);
-          line.splice(j+1, 1);
-          moved = true;
+      for (let i = 0; i < 4; i++) {
+        const lineIndices = getLine(i, dir);
+        let line = lineIndices.map(idx => newGrid[idx]).filter(v => v !== 0);
+        
+        for (let j = 0; j < line.length - 1; j++) {
+          if (line[j] === line[j+1]) {
+            line[j] *= 2;
+            setScore(s => s + line[j]);
+            if (line[j] === 128) setWon(true);
+            line.splice(j+1, 1);
+            moved = true;
+          }
         }
+        
+        const newLine = [...line, ...Array(4 - line.length).fill(0)];
+        lineIndices.forEach((idx, j) => {
+          if (newGrid[idx] !== newLine[j]) moved = true;
+          newGrid[idx] = newLine[j];
+        });
       }
-      
-      const newLine = [...line, ...Array(4 - line.length).fill(0)];
-      lineIndices.forEach((idx, j) => {
-        if (newGrid[idx] !== newLine[j]) moved = true;
-        newGrid[idx] = newLine[j];
-      });
-    }
 
-    if (moved) {
-      newGrid = addRandom(newGrid);
-      setGrid(newGrid);
-      if (!canMove(newGrid)) setGameOver(true);
-    }
-  };
+      if (moved) {
+        newGrid = addRandom(newGrid);
+        if (!canMove(newGrid)) setGameOver(true);
+        return newGrid;
+      }
+      return prevGrid;
+    });
+  }, [gameOver, won]);
 
   function canMove(g) {
     if (g.includes(0)) return true;
@@ -193,7 +198,7 @@ function Game128({ onScore }) {
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [grid, gameOver, won]);
+  }, [move]);
 
   const colors = {
     0: 'bg-secondary/50',
@@ -243,13 +248,13 @@ function Game128({ onScore }) {
       </div>
     </div>
   );
-}
+});
 
-export function RestMinigames({ user }) {
+export const RestMinigames = React.memo(({ user }) => {
   const [activeGame, setActiveGame] = useState(null);
   const [saving, setSaving] = useState(false);
 
-  const handleScore = async (gameName, score) => {
+  const handleScore = useCallback(async (gameName, score) => {
     if (!user) return;
     setSaving(true);
     try {
@@ -263,7 +268,7 @@ export function RestMinigames({ user }) {
     } finally {
       setSaving(false);
     }
-  };
+  }, [user]);
 
   return (
     <div className="bg-card border border-border rounded-2xl p-4 space-y-4">
@@ -316,4 +321,4 @@ export function RestMinigames({ user }) {
       )}
     </div>
   );
-}
+});

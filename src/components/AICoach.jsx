@@ -39,10 +39,10 @@ export function AICoach({ profile }) {
     setIsLoading(true);
 
     try {
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-      
-      // Build a simple prompt context
-      const systemPrompt = `You are a professional, encouraging fitness coach. Keep answers concise, practical, and tailored for a gym app user. User profile: ${JSON.stringify(profile)}.`;
+      const model = genAI.getGenerativeModel({ 
+        model: "gemini-1.5-flash",
+        systemInstruction: `You are a professional, encouraging fitness coach. Keep answers concise, practical, and tailored for a gym app user. User profile: ${JSON.stringify(profile)}.`
+      });
       
       const chat = model.startChat({
         history: messages.slice(1).map(m => ({
@@ -52,13 +52,17 @@ export function AICoach({ profile }) {
         generationConfig: { maxOutputTokens: 1000 },
       });
 
-      const result = await chat.sendMessage(`${systemPrompt}\n\nUser: ${text}`);
+      const result = await chat.sendMessage(text);
       const response = await result.response;
       
       setMessages([...newMessages, { role: 'assistant', content: response.text() }]);
     } catch (error) {
-      console.error(error);
-      setMessages([...newMessages, { role: 'assistant', content: 'Oops! I had trouble connecting. Please check your API key or internet connection.' }]);
+      console.error('Gemini API Error:', error);
+      let errorMsg = 'Oops! I had trouble connecting. Please check your API key or internet connection.';
+      if (error.message?.includes('API_KEY_INVALID')) {
+        errorMsg = 'Your Gemini API key seems to be invalid. Please double-check it in your .env.local file.';
+      }
+      setMessages([...newMessages, { role: 'assistant', content: errorMsg }]);
     } finally {
       setIsLoading(false);
     }
