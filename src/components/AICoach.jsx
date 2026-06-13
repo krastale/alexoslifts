@@ -49,32 +49,28 @@ export function AICoach({ profile, addRoutine }) {
     setIsSaved(false);
 
     try {
-      // Using a slightly more reliable model path and adding better response checking
-      const systemPrompt = `You are a professional fitness coach. Keep answers short. If recommending a routine, use JSON: {"name": "...", "exercises": [{"name": "...", "sets": 3, "reps": 10}]}`;
-      const payload = {
-        inputs: `[INST] ${systemPrompt} ${text} [/INST]`,
-        parameters: { max_new_tokens: 400, return_full_text: false }
-      };
+      // Use Pollinations.ai - 100% free, no key required, very stable.
+      const systemPrompt = `You are a professional fitness coach. Keep answers short and practical. 
+      User profile: ${JSON.stringify(profile)}.
+      If recommending a routine, you MUST include a JSON block at the end: {"name": "...", "exercises": [{"name": "...", "sets": 3, "reps": 10}]}`;
 
-      const response = await fetch(
-        "https://api-inference.huggingface.co/models/HuggingFaceH4/zephyr-7b-beta",
-        {
-          headers: { "Content-Type": "application/json" },
-          method: "POST",
-          body: JSON.stringify(payload),
-        }
-      );
+      const response = await fetch("https://text.pollinations.ai/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [
+            { role: "system", content: systemPrompt },
+            ...messages.slice(1).map(m => ({ role: m.role, content: m.content })),
+            { role: "user", content: text }
+          ],
+          model: "openai", // Uses GPT-4o-mini or similar behind the scenes for free
+          seed: 42
+        }),
+      });
 
-      if (!response.ok) throw new Error(`API Error: ${response.status}`);
+      if (!response.ok) throw new Error("API Limit reached");
       
-      const result = await response.json();
-      let responseText = "";
-      
-      if (Array.isArray(result)) {
-        responseText = result[0]?.generated_text || "";
-      } else if (result.generated_text) {
-        responseText = result.generated_text;
-      }
+      const responseText = await response.text();
 
       if (!responseText) throw new Error("Empty response");
 
@@ -84,8 +80,7 @@ export function AICoach({ profile, addRoutine }) {
       setMessages([...newMessages, { role: 'assistant', content: responseText }]);
     } catch (error) {
       console.error('AI Error:', error);
-      // Fallback message with more detail
-      setMessages([...newMessages, { role: 'assistant', content: "The AI is currently under heavy load. Please try one more time in 5 seconds!" }]);
+      setMessages([...newMessages, { role: 'assistant', content: "I'm having a short break. Please try clicking send again in a moment!" }]);
     } finally {
       setIsLoading(false);
     }
