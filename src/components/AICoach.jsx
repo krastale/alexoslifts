@@ -49,26 +49,15 @@ export function AICoach({ profile, addRoutine }) {
     setIsSaved(false);
 
     try {
-      // Use Pollinations.ai - 100% free, no key required, very stable.
-      const systemPrompt = `You are a professional fitness coach. Keep answers short and practical. 
-      User profile: ${JSON.stringify(profile)}.
-      If recommending a routine, you MUST include a JSON block at the end: {"name": "...", "exercises": [{"name": "...", "sets": 3, "reps": 10}]}`;
+      // Use Pollinations.ai - Pure free text stream.
+      const prompt = `System: You are a professional gym coach. Be concise. 
+      User context: ${JSON.stringify(profile)}.
+      Goal: ${text}.
+      If recommending a routine, add this JSON at the end: {"name": "...", "exercises": [{"name": "...", "sets": 3, "reps": 10}]}`;
 
-      const response = await fetch("https://text.pollinations.ai/", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: [
-            { role: "system", content: systemPrompt },
-            ...messages.slice(1).map(m => ({ role: m.role, content: m.content })),
-            { role: "user", content: text }
-          ],
-          model: "openai", // Uses GPT-4o-mini or similar behind the scenes for free
-          seed: 42
-        }),
-      });
+      const response = await fetch(`https://text.pollinations.ai/${encodeURIComponent(prompt)}`);
 
-      if (!response.ok) throw new Error("API Limit reached");
+      if (!response.ok) throw new Error("Connection lost");
       
       const responseText = await response.text();
 
@@ -80,7 +69,7 @@ export function AICoach({ profile, addRoutine }) {
       setMessages([...newMessages, { role: 'assistant', content: responseText }]);
     } catch (error) {
       console.error('AI Error:', error);
-      setMessages([...newMessages, { role: 'assistant', content: "I'm having a short break. Please try clicking send again in a moment!" }]);
+      setMessages([...newMessages, { role: 'assistant', content: "I'm having a quick rest. Please try sending your message again!" }]);
     } finally {
       setIsLoading(false);
     }
