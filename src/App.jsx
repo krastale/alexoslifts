@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { useData } from './hooks/useData';
-import { Home, Dumbbell, Settings as SettingsIcon, Loader2, BarChart2, Bot, Users } from 'lucide-react';
+import { Home, Dumbbell, Settings as SettingsIcon, Loader2, BarChart2, Users } from 'lucide-react';
 
 import { Auth } from './components/Auth';
 import { Onboarding } from './components/Onboarding';
@@ -10,7 +10,6 @@ import { RoutineBuilder } from './components/RoutineBuilder';
 import { WorkoutLogger } from './components/WorkoutLogger';
 import { Settings } from './components/Settings';
 import { Progress } from './components/Progress';
-import { AICoach } from './components/AICoach';
 import { Community } from './components/Community';
 
 function AppContent() {
@@ -91,8 +90,6 @@ function AppContent() {
             deletePhoto={deletePhoto}
           />
         );
-      case 'coach':
-        return <AICoach profile={profile} addRoutine={addRoutine} />;
       case 'community':
         return <Community profile={profile} />;
       case 'settings':
@@ -112,7 +109,7 @@ function AppContent() {
         <div className="max-w-md mx-auto lg:max-w-none flex justify-between items-center min-w-max gap-2 px-2">
           <button
             onClick={() => setActiveTab('dashboard')}
-            className={`flex flex-col items-center p-2 rounded-xl transition-all min-w-[60px] ${
+            className={`flex flex-col items-center p-2 rounded-xl transition-all min-w-[70px] ${
               activeTab === 'dashboard' ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
             }`}
           >
@@ -122,7 +119,7 @@ function AppContent() {
 
           <button
             onClick={() => setActiveTab('routines')}
-            className={`flex flex-col items-center p-2 rounded-xl transition-all min-w-[60px] ${
+            className={`flex flex-col items-center p-2 rounded-xl transition-all min-w-[70px] ${
               activeTab === 'routines' ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
             }`}
           >
@@ -131,18 +128,8 @@ function AppContent() {
           </button>
 
           <button
-            onClick={() => setActiveTab('coach')}
-            className={`flex flex-col items-center p-2 rounded-xl transition-all min-w-[60px] ${
-              activeTab === 'coach' ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            <Bot className="w-6 h-6" />
-            <span className="text-[10px] font-bold mt-1 uppercase tracking-tighter">Coach</span>
-          </button>
-
-          <button
             onClick={() => setActiveTab('community')}
-            className={`flex flex-col items-center p-2 rounded-xl transition-all min-w-[60px] ${
+            className={`flex flex-col items-center p-2 rounded-xl transition-all min-w-[70px] ${
               activeTab === 'community' ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
             }`}
           >
@@ -152,7 +139,7 @@ function AppContent() {
 
           <button
             onClick={() => setActiveTab('progress')}
-            className={`flex flex-col items-center p-2 rounded-xl transition-all min-w-[60px] ${
+            className={`flex flex-col items-center p-2 rounded-xl transition-all min-w-[70px] ${
               activeTab === 'progress' ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
             }`}
           >
@@ -162,7 +149,7 @@ function AppContent() {
 
           <button
             onClick={() => setActiveTab('settings')}
-            className={`flex flex-col items-center p-2 rounded-xl transition-all min-w-[60px] ${
+            className={`flex flex-col items-center p-2 rounded-xl transition-all min-w-[70px] ${
               activeTab === 'settings' ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
             }`}
           >
