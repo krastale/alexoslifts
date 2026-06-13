@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { useData } from './hooks/useData';
-import { Home, Dumbbell, Settings as SettingsIcon, Loader2, BarChart2 } from 'lucide-react';
+import { Home, Dumbbell, Settings as SettingsIcon, Loader2, BarChart2, Bot, Users } from 'lucide-react';
 
 import { Auth } from './components/Auth';
 import { Onboarding } from './components/Onboarding';
@@ -10,6 +10,8 @@ import { RoutineBuilder } from './components/RoutineBuilder';
 import { WorkoutLogger } from './components/WorkoutLogger';
 import { Settings } from './components/Settings';
 import { Progress } from './components/Progress';
+import { AICoach } from './components/AICoach';
+import { Community } from './components/Community';
 
 function AppContent() {
   const { user, loading: authLoading } = useAuth();
@@ -77,10 +79,11 @@ function AppContent() {
         return <RoutineBuilder routines={routines} addRoutine={addRoutine} deleteRoutine={deleteRoutine} />;
       case 'progress':
         return (
-          <Progress 
-            profile={profile} 
-            history={history} 
-            measurements={measurements} 
+          <Progress
+            profile={profile}
+            updateProfile={updateProfile}
+            history={history}
+            measurements={measurements}
             addMeasurement={addMeasurement}
             deleteMeasurement={deleteMeasurement}
             photos={photos}
@@ -88,6 +91,10 @@ function AppContent() {
             deletePhoto={deletePhoto}
           />
         );
+      case 'coach':
+        return <AICoach profile={profile} />;
+      case 'community':
+        return <Community profile={profile} />;
       case 'settings':
         return <Settings profile={profile} updateProfile={updateProfile} />;
       default:
@@ -101,11 +108,11 @@ function AppContent() {
         {renderContent()}
       </main>
 
-      <nav className="fixed bottom-0 left-0 right-0 bg-background/80 backdrop-blur-lg border-t border-border p-2 lg:sticky lg:top-0 lg:order-first lg:border-t-0 lg:border-b">
-        <div className="max-w-md mx-auto lg:max-w-none flex justify-around items-center">
+      <nav className="fixed bottom-0 left-0 right-0 bg-background/80 backdrop-blur-lg border-t border-border p-2 lg:sticky lg:top-0 lg:order-first lg:border-t-0 lg:border-b overflow-x-auto no-scrollbar">
+        <div className="max-w-md mx-auto lg:max-w-none flex justify-between items-center min-w-max gap-2 px-2">
           <button
             onClick={() => setActiveTab('dashboard')}
-            className={`flex flex-col items-center p-2 rounded-xl transition-all ${
+            className={`flex flex-col items-center p-2 rounded-xl transition-all min-w-[60px] ${
               activeTab === 'dashboard' ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
             }`}
           >
@@ -115,7 +122,7 @@ function AppContent() {
 
           <button
             onClick={() => setActiveTab('routines')}
-            className={`flex flex-col items-center p-2 rounded-xl transition-all ${
+            className={`flex flex-col items-center p-2 rounded-xl transition-all min-w-[60px] ${
               activeTab === 'routines' ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
             }`}
           >
@@ -124,8 +131,28 @@ function AppContent() {
           </button>
 
           <button
+            onClick={() => setActiveTab('coach')}
+            className={`flex flex-col items-center p-2 rounded-xl transition-all min-w-[60px] ${
+              activeTab === 'coach' ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Bot className="w-6 h-6" />
+            <span className="text-[10px] font-bold mt-1 uppercase tracking-tighter">Coach</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('community')}
+            className={`flex flex-col items-center p-2 rounded-xl transition-all min-w-[60px] ${
+              activeTab === 'community' ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Users className="w-6 h-6" />
+            <span className="text-[10px] font-bold mt-1 uppercase tracking-tighter">Social</span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('progress')}
-            className={`flex flex-col items-center p-2 rounded-xl transition-all ${
+            className={`flex flex-col items-center p-2 rounded-xl transition-all min-w-[60px] ${
               activeTab === 'progress' ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
             }`}
           >
@@ -135,7 +162,7 @@ function AppContent() {
 
           <button
             onClick={() => setActiveTab('settings')}
-            className={`flex flex-col items-center p-2 rounded-xl transition-all ${
+            className={`flex flex-col items-center p-2 rounded-xl transition-all min-w-[60px] ${
               activeTab === 'settings' ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
             }`}
           >

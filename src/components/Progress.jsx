@@ -3,19 +3,20 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer 
 } from 'recharts';
 import { 
-  Plus, Camera, Trash2, Ruler, TrendingUp, Sparkles, Loader2, Calendar, ChevronDown, ChevronUp 
+  Plus, Camera, Trash2, Ruler, TrendingUp, Sparkles, Loader2, Calendar, ChevronDown, ChevronUp, Settings2 
 } from 'lucide-react';
 
-export function Progress({ profile, history, measurements, addMeasurement, deleteMeasurement, photos, uploadPhoto, deletePhoto }) {
+export function Progress({ profile, updateProfile, history, measurements, addMeasurement, deleteMeasurement, photos, uploadPhoto, deletePhoto }) {
   const [isAddingMeasurement, setIsAddingMeasurement] = useState(false);
+  const [isManagingTypes, setIsManagingTypes] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const [newMeasurement, setNewMeasurement] = useState({
-    weight: '',
-    bicep: '',
-    chest: '',
-    waist: '',
-    thigh: ''
-  });
+  const [newMeasurementType, setNewMeasurementType] = useState('');
+  
+  const defaultTypes = ['Weight', 'Bicep', 'Waist', 'Chest', 'Thigh'];
+  const measurementTypes = profile?.measurement_types || defaultTypes;
+
+  const [newMeasurementData, setNewMeasurementData] = useState({});
+  const [selectedChartMetric, setSelectedChartMetric] = useState('Weight');
   
   const fileInputRef = useRef(null);
 
@@ -24,8 +25,11 @@ export function Progress({ profile, history, measurements, addMeasurement, delet
     if (!history || history.length === 0) return "Start your first workout to begin your journey!";
     
     const workoutCount = history.length;
-    const latestWeight = measurements[0]?.weight;
-    const initialWeight = measurements[measurements.length - 1]?.weight;
+    // We look for 'Weight' in either the direct column (legacy) or the data JSONB column
+    const getWeight = (m) => m?.weight || m?.data?.Weight;
+    
+    const latestWeight = getWeight(measurements[0]);
+    const initialWeight = getWeight(measurements[measurements.length - 1]);
     
     let message = `You've completed ${workoutCount} workouts. `;
     
@@ -43,11 +47,39 @@ export function Progress({ profile, history, measurements, addMeasurement, delet
     return message;
   }, [history, measurements, profile]);
 
+  const handleAddMeasurementType = async (e) => {
+    e.preventDefault();
+    if (!newMeasurementType.trim() || measurementTypes.includes(newMeasurementType.trim())) return;
+    
+    const updatedTypes = [...measurementTypes, newMeasurementType.trim()];
+    await updateProfile({ measurement_types: updatedTypes });
+    setNewMeasurementType('');
+  };
+
+  const handleRemoveMeasurementType = async (typeToRemove) => {
+    const updatedTypes = measurementTypes.filter(t => t !== typeToRemove);
+    await updateProfile({ measurement_types: updatedTypes });
+    if (selectedChartMetric === typeToRemove) {
+      setSelectedChartMetric(updatedTypes[0] || '');
+    }
+  };
+
   const handleAddMeasurement = async (e) => {
     e.preventDefault();
-    const { error } = await addMeasurement(newMeasurement);
+    // Prepare data. We keep 'weight' at root if it exists for backwards compatibility
+    const payload = { 
+      date: new Date().toISOString(),
+      data: newMeasurementData 
+    };
+    
+    // Legacy support: if 'Weight' is one of the custom data fields, also save it in root
+    if (newMeasurementData['Weight']) {
+      payload.weight = parseFloat(newMeasurementData['Weight']);
+    }
+
+    const { error } = await addMeasurement(payload);
     if (!error) {
-      setNewMeasurement({ weight: '', bicep: '', chest: '', waist: '', thigh: '' });
+      setNewMeasurementData({});
       setIsAddingMeasurement(false);
     }
   };
@@ -62,13 +94,15 @@ export function Progress({ profile, history, measurements, addMeasurement, delet
   };
 
   const chartData = useMemo(() => {
-    return [...measurements].reverse().map(m => ({
-      date: new Date(m.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
-      weight: parseFloat(m.weight),
-      bicep: parseFloat(m.bicep),
-      waist: parseFloat(m.waist)
-    }));
-  }, [measurements]);
+    return [...measurements].reverse().map(m => {
+      // Find the value for the selected metric. Look in data JSONB, fallback to legacy column if available
+      const val = m.data?.[selectedChartMetric] || m[selectedChartMetric.toLowerCase()];
+      return {
+        date: new Date(m.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+        value: val ? parseFloat(val) : null
+      };
+    }).filter(d => d.value !== null); // Only show points that have data for this metric
+  }, [measurements, selectedChartMetric]);
 
   return (
     <div className="p-6 space-y-8 pb-32 lg:pb-12">
@@ -92,63 +126,68 @@ export function Progress({ profile, history, measurements, addMeasurement, delet
             <Ruler className="w-5 h-5 text-muted-foreground" />
             Measurements
           </h2>
-          <button 
-            onClick={() => setIsAddingMeasurement(!isAddingMeasurement)}
-            className="text-primary text-sm font-bold flex items-center gap-1 hover:underline"
-          >
-            {isAddingMeasurement ? <ChevronUp className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
-            {isAddingMeasurement ? 'Close' : 'Log New'}
-          </button>
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={() => setIsManagingTypes(!isManagingTypes)}
+              className="text-muted-foreground text-sm font-bold flex items-center gap-1 hover:text-primary transition-colors"
+            >
+              <Settings2 className="w-4 h-4" />
+            </button>
+            <button 
+              onClick={() => setIsAddingMeasurement(!isAddingMeasurement)}
+              className="text-primary text-sm font-bold flex items-center gap-1 hover:underline"
+            >
+              {isAddingMeasurement ? <ChevronUp className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+              {isAddingMeasurement ? 'Close' : 'Log New'}
+            </button>
+          </div>
         </div>
 
+        {/* Manage Measurement Types Form */}
+        {isManagingTypes && (
+          <div className="bg-card border border-border p-6 rounded-2xl space-y-4 animate-in fade-in slide-in-from-top-4 duration-300">
+            <h3 className="font-bold text-sm text-muted-foreground uppercase">Manage Tracked Metrics</h3>
+            <div className="flex flex-wrap gap-2">
+              {measurementTypes.map(type => (
+                <div key={type} className="bg-secondary px-3 py-1.5 rounded-lg flex items-center gap-2 text-sm font-medium">
+                  {type}
+                  <button onClick={() => handleRemoveMeasurementType(type)} className="text-muted-foreground hover:text-red-500">
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <form onSubmit={handleAddMeasurementType} className="flex gap-2">
+              <input 
+                type="text" 
+                placeholder="New Metric (e.g., Body Fat %)"
+                className="flex-1 bg-secondary border border-border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-primary text-sm"
+                value={newMeasurementType}
+                onChange={e => setNewMeasurementType(e.target.value)}
+              />
+              <button type="submit" className="bg-primary text-white px-4 rounded-lg font-bold text-sm">Add</button>
+            </form>
+          </div>
+        )}
+
+        {/* Log New Measurement Form */}
         {isAddingMeasurement && (
           <form onSubmit={handleAddMeasurement} className="bg-card border border-border p-6 rounded-2xl space-y-4 animate-in fade-in slide-in-from-top-4 duration-300">
             <div className="grid grid-cols-2 gap-4">
-              <div className="col-span-2">
-                <label className="text-xs font-bold text-muted-foreground uppercase mb-1 block">Weight ({profile?.units})</label>
-                <input 
-                  type="number" step="0.1" required
-                  className="w-full bg-secondary border border-border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-primary"
-                  value={newMeasurement.weight}
-                  onChange={e => setNewMeasurement({...newMeasurement, weight: e.target.value})}
-                />
-              </div>
-              <div>
-                <label className="text-xs font-bold text-muted-foreground uppercase mb-1 block">Bicep (cm)</label>
-                <input 
-                  type="number" step="0.1"
-                  className="w-full bg-secondary border border-border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-primary"
-                  value={newMeasurement.bicep}
-                  onChange={e => setNewMeasurement({...newMeasurement, bicep: e.target.value})}
-                />
-              </div>
-              <div>
-                <label className="text-xs font-bold text-muted-foreground uppercase mb-1 block">Waist (cm)</label>
-                <input 
-                  type="number" step="0.1"
-                  className="w-full bg-secondary border border-border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-primary"
-                  value={newMeasurement.waist}
-                  onChange={e => setNewMeasurement({...newMeasurement, waist: e.target.value})}
-                />
-              </div>
-              <div>
-                <label className="text-xs font-bold text-muted-foreground uppercase mb-1 block">Chest (cm)</label>
-                <input 
-                  type="number" step="0.1"
-                  className="w-full bg-secondary border border-border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-primary"
-                  value={newMeasurement.chest}
-                  onChange={e => setNewMeasurement({...newMeasurement, chest: e.target.value})}
-                />
-              </div>
-              <div>
-                <label className="text-xs font-bold text-muted-foreground uppercase mb-1 block">Thigh (cm)</label>
-                <input 
-                  type="number" step="0.1"
-                  className="w-full bg-secondary border border-border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-primary"
-                  value={newMeasurement.thigh}
-                  onChange={e => setNewMeasurement({...newMeasurement, thigh: e.target.value})}
-                />
-              </div>
+              {measurementTypes.map(type => (
+                <div key={type} className={type.toLowerCase() === 'weight' ? 'col-span-2' : ''}>
+                  <label className="text-xs font-bold text-muted-foreground uppercase mb-1 block">
+                    {type} {type.toLowerCase() === 'weight' ? `(${profile?.units})` : ''}
+                  </label>
+                  <input 
+                    type="number" step="0.1" 
+                    required={type.toLowerCase() === 'weight'}
+                    className="w-full bg-secondary border border-border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-primary"
+                    value={newMeasurementData[type] || ''}
+                    onChange={e => setNewMeasurementData({...newMeasurementData, [type]: e.target.value})}
+                  />
+                </div>
+              ))}
             </div>
             <button type="submit" className="w-full bg-primary text-white font-bold py-3 rounded-lg shadow-lg shadow-primary/20">
               Save Entry
@@ -158,35 +197,64 @@ export function Progress({ profile, history, measurements, addMeasurement, delet
 
         {measurements.length > 0 ? (
           <div className="space-y-6">
-            <div className="bg-card border border-border p-4 rounded-2xl h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#27272a" />
-                  <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fill: '#a1a1aa', fontSize: 10}} />
-                  <YAxis hide domain={['dataMin - 5', 'dataMax + 5']} />
-                  <Tooltip contentStyle={{backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: '8px'}} />
-                  <Line type="monotone" dataKey="weight" stroke="#3b82f6" strokeWidth={3} dot={{fill: '#3b82f6'}} />
-                </LineChart>
-              </ResponsiveContainer>
+            {/* Chart */}
+            <div className="bg-card border border-border p-4 rounded-2xl space-y-4">
+              <div className="flex justify-between items-center px-2">
+                <select 
+                  className="bg-transparent text-sm font-bold outline-none text-foreground cursor-pointer"
+                  value={selectedChartMetric}
+                  onChange={(e) => setSelectedChartMetric(e.target.value)}
+                >
+                  {measurementTypes.map(t => <option key={t} value={t} className="bg-card">{t}</option>)}
+                </select>
+              </div>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#27272a" />
+                    <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fill: '#a1a1aa', fontSize: 10}} />
+                    <YAxis hide domain={['dataMin - 5', 'dataMax + 5']} />
+                    <Tooltip 
+                      contentStyle={{backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: '8px'}}
+                      labelStyle={{color: '#a1a1aa', fontSize: '12px', marginBottom: '4px'}}
+                      itemStyle={{color: '#3b82f6', fontWeight: 'bold'}}
+                    />
+                    <Line type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={3} dot={{fill: '#3b82f6'}} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
             </div>
             
+            {/* History Cards */}
             <div className="flex gap-4 overflow-x-auto pb-2 no-scrollbar">
-              {measurements.slice(0, 5).map(m => (
-                <div key={m.id} className="min-w-[140px] bg-card border border-border p-4 rounded-xl space-y-2 relative">
-                  <p className="text-[10px] font-bold text-muted-foreground uppercase">{new Date(m.date).toLocaleDateString()}</p>
-                  <p className="text-xl font-bold">{m.weight} <span className="text-xs font-normal text-muted-foreground">{profile?.units}</span></p>
-                  <div className="text-[10px] text-muted-foreground space-y-0.5">
-                    {m.bicep && <p>Bicep: {m.bicep}cm</p>}
-                    {m.waist && <p>Waist: {m.waist}cm</p>}
+              {measurements.slice(0, 5).map(m => {
+                const weight = m.data?.Weight || m.weight;
+                return (
+                  <div key={m.id} className="min-w-[140px] max-w-[200px] bg-card border border-border p-4 rounded-xl space-y-2 relative flex-shrink-0">
+                    <p className="text-[10px] font-bold text-muted-foreground uppercase">{new Date(m.date).toLocaleDateString()}</p>
+                    {weight && (
+                      <p className="text-xl font-bold">{weight} <span className="text-xs font-normal text-muted-foreground">{profile?.units}</span></p>
+                    )}
+                    <div className="text-[10px] text-muted-foreground space-y-0.5">
+                      {Object.entries(m.data || {}).map(([key, val]) => {
+                        if (key === 'Weight' || !val) return null; // Already displayed or empty
+                        return <p key={key} className="truncate">{key}: {val}</p>;
+                      })}
+                      {/* Fallback for legacy data */}
+                      {!m.data && Object.entries(m).map(([key, val]) => {
+                        if (['id', 'user_id', 'date', 'weight'].includes(key) || !val) return null;
+                        return <p key={key} className="capitalize truncate">{key}: {val}</p>;
+                      })}
+                    </div>
+                    <button 
+                      onClick={() => deleteMeasurement(m.id)}
+                      className="absolute top-2 right-2 text-muted-foreground hover:text-red-500"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
                   </div>
-                  <button 
-                    onClick={() => deleteMeasurement(m.id)}
-                    className="absolute top-2 right-2 text-muted-foreground hover:text-red-500"
-                  >
-                    <Trash2 className="w-3 h-3" />
-                  </button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         ) : (

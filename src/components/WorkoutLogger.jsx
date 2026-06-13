@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Check, Play, Save, X, Plus, Trash2, ChevronLeft } from 'lucide-react';
+import { Check, Play, Save, X, Plus, Trash2, ChevronLeft, Timer } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { RestMinigames } from './Minigames';
 
 export function WorkoutLogger({ routine, onSave, onCancel }) {
+  const { user } = useAuth();
   const [workout, setWorkout] = useState({
     routineName: routine.name,
     date: new Date().toISOString(),
@@ -13,6 +16,10 @@ export function WorkoutLogger({ routine, onSave, onCancel }) {
 
   const [startTime] = useState(Date.now());
   const [elapsed, setElapsed] = useState(0);
+  
+  // Rest Timer State
+  const [isResting, setIsResting] = useState(false);
+  const [restTimeLeft, setRestTimeLeft] = useState(0);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -20,6 +27,23 @@ export function WorkoutLogger({ routine, onSave, onCancel }) {
     }, 1000);
     return () => clearInterval(timer);
   }, [startTime]);
+
+  // Rest Timer effect
+  useEffect(() => {
+    let restInterval;
+    if (isResting && restTimeLeft > 0) {
+      restInterval = setInterval(() => {
+        setRestTimeLeft(prev => {
+          if (prev <= 1) {
+            setIsResting(false);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => clearInterval(restInterval);
+  }, [isResting, restTimeLeft]);
 
   const formatTime = (seconds) => {
     const h = Math.floor(seconds / 3600);
@@ -36,8 +60,15 @@ export function WorkoutLogger({ routine, onSave, onCancel }) {
 
   const toggleSet = (exIdx, setIdx) => {
     const updated = { ...workout };
-    updated.exercises[exIdx].sets[setIdx].completed = !updated.exercises[exIdx].sets[setIdx].completed;
+    const willBeCompleted = !updated.exercises[exIdx].sets[setIdx].completed;
+    updated.exercises[exIdx].sets[setIdx].completed = willBeCompleted;
     setWorkout(updated);
+
+    if (willBeCompleted) {
+      // Start rest timer (e.g., 60 seconds)
+      setIsResting(true);
+      setRestTimeLeft(60);
+    }
   };
 
   const addSet = (exIdx) => {
@@ -51,14 +82,7 @@ export function WorkoutLogger({ routine, onSave, onCancel }) {
     setWorkout(updated);
   };
 
-  const removeSet = (exIdx, setIdx) => {
-    const updated = { ...workout };
-    updated.exercises[exIdx].sets.splice(setIdx, 1);
-    setWorkout(updated);
-  };
-
   const handleFinish = () => {
-    // Only save completed sets or all sets? Let's save all but maybe filter empty ones
     onSave({
       ...workout,
       duration: elapsed,
@@ -67,7 +91,7 @@ export function WorkoutLogger({ routine, onSave, onCancel }) {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-32">
+    <div className="min-h-screen bg-background pb-40">
       <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-md border-b border-border p-4">
         <div className="max-w-3xl mx-auto flex justify-between items-center">
           <div className="flex items-center gap-3">
@@ -161,6 +185,34 @@ export function WorkoutLogger({ routine, onSave, onCancel }) {
           </div>
         ))}
       </div>
+
+      {/* Rest Timer Overlay */}
+      {isResting && (
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/95 backdrop-blur-lg border-t border-border z-20 animate-in slide-in-from-bottom-full duration-300 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.5)]">
+          <div className="max-w-3xl mx-auto space-y-4">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-3">
+                <div className="bg-primary/20 p-2 rounded-xl text-primary animate-pulse">
+                  <Timer className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-lg">Rest Time</h3>
+                  <p className="text-primary font-mono text-2xl">{formatTime(restTimeLeft)}</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setIsResting(false)}
+                className="bg-secondary px-4 py-2 rounded-lg text-sm font-bold hover:bg-secondary/80"
+              >
+                Skip
+              </button>
+            </div>
+
+            {/* Embed the Minigames */}
+            <RestMinigames user={user} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
