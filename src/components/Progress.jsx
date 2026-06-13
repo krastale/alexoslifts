@@ -12,7 +12,7 @@ export function Progress({ profile, updateProfile, history, measurements, addMea
   const [isUploading, setIsUploading] = useState(false);
   const [newMeasurementType, setNewMeasurementType] = useState('');
   
-  const defaultTypes = ['Weight', 'Bicep', 'Waist', 'Chest', 'Thigh'];
+  const defaultTypes = ['Weight', 'Bicep', 'Waist', 'Chest', 'Thigh', 'Gluteus'];
   const measurementTypes = profile?.measurement_types || defaultTypes;
 
   const [newMeasurementData, setNewMeasurementData] = useState({});

@@ -1,16 +1,11 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
-import { GoogleGenerativeAI } from '@google/generative-ai';
-import { Send, Bot, User, Sparkles, AlertCircle, Dumbbell, Activity, Utensils, Save, CheckCircle2, Settings } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { Send, Bot, User, Sparkles, Dumbbell, Activity, Utensils, Save, CheckCircle2 } from 'lucide-react';
 
 export function AICoach({ profile, addRoutine }) {
-  // Use user's custom key if available, fallback to environment variable
-  const activeApiKey = profile?.ai_api_key || import.meta.env.VITE_GEMINI_API_KEY;
-  const genAI = activeApiKey ? new GoogleGenerativeAI(activeApiKey) : null;
-
   const [messages, setMessages] = useState([
     {
       role: 'assistant',
-      content: `Hi ${profile?.username || 'there'}! I'm your AI fitness coach. I can help you create workout plans, check your form, or give nutrition advice. How can I help today?`
+      content: `Hi ${profile?.username || profile?.name || 'there'}! I'm your AI fitness coach. I use open-source models to help you for free. I can create workout plans, check your form, or give nutrition advice. How can I help today?`
     }
   ]);
   const [input, setInput] = useState('');
@@ -29,7 +24,6 @@ export function AICoach({ profile, addRoutine }) {
 
   const parseRoutine = (text) => {
     try {
-      // Look for JSON block in the response
       const jsonMatch = text.match(/```json\n([\s\S]*?)\n```/) || text.match(/{[\s\S]*"exercises"[\s\S]*}/);
       if (jsonMatch) {
         const rawJson = jsonMatch[0].replace(/```json|```/g, '').trim();
@@ -47,15 +41,6 @@ export function AICoach({ profile, addRoutine }) {
   const handleSend = async (text = input) => {
     if (!text.trim()) return;
     
-    if (!activeApiKey) {
-      setMessages(prev => [...prev, { role: 'user', content: text }, { 
-        role: 'assistant', 
-        content: "I need an API key to help you. Please go to **Settings** and add your free Gemini API key from Google AI Studio." 
-      }]);
-      setInput('');
-      return;
-    }
-
     const newMessages = [...messages, { role: 'user', content: text }];
     setMessages(newMessages);
     setInput('');
@@ -64,53 +49,39 @@ export function AICoach({ profile, addRoutine }) {
     setIsSaved(false);
 
     try {
-      if (!genAI) throw new Error("AI not initialized");
-      
-      const model = genAI.getGenerativeModel({ 
-        model: "gemini-1.5-flash",
-        systemInstruction: `You are a professional, encouraging fitness coach. Keep answers concise and practical. 
-        User profile: ${JSON.stringify(profile)}.
-        
-        CRITICAL: If the user wants a workout plan or routine, you MUST suggest it in the following JSON format at the end of your message wrapped in code blocks:
-        {
-          "name": "Routine Name",
-          "exercises": [
-            { "name": "Exercise Name", "sets": 3, "reps": 10 },
-            ...
-          ]
-        }
-        Do not include any other text inside the JSON code block.`
-      });
-      
-      const chat = model.startChat({
-        history: messages.slice(1).map(m => ({
-          role: m.role === 'assistant' ? 'model' : 'user',
-          parts: [{ text: m.content }],
-        })),
-        generationConfig: { maxOutputTokens: 1000 },
-      });
+      // Plan B: Use Hugging Face Serverless Inference (Free, no key required for light usage)
+      // We use a powerful open-source model like Mistral or Llama
+      const systemPrompt = `You are a professional fitness coach. Keep answers concise. 
+      User: ${JSON.stringify(profile)}.
+      If recommending a routine, end with a JSON block: {"name": "...", "exercises": [{"name": "...", "sets": 3, "reps": 10}]}`;
 
-      const result = await chat.sendMessage(text);
-      const response = await result.response;
-      const responseText = response.text();
+      const response = await fetch(
+        "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2",
+        {
+          headers: { "Content-Type": "application/json" },
+          method: "POST",
+          body: JSON.stringify({
+            inputs: `<s>[INST] ${systemPrompt} [/INST] ${text}</s>`,
+            parameters: { max_new_tokens: 500, temperature: 0.7 }
+          }),
+        }
+      );
+
+      const result = await response.json();
+      let responseText = result[0]?.generated_text || "";
       
-      const routine = parseRoutine(responseText);
-      if (routine) {
-        setProposedRoutine(routine);
+      // Remove the prompt from the response if Hugging Face returns it
+      if (responseText.includes('[/INST]')) {
+        responseText = responseText.split('[/INST]').pop().trim();
       }
+
+      const routine = parseRoutine(responseText);
+      if (routine) setProposedRoutine(routine);
 
       setMessages([...newMessages, { role: 'assistant', content: responseText }]);
     } catch (error) {
-      console.error('Gemini API Error:', error);
-      let errorMsg = `Error: ${error.message || 'I had trouble connecting. Please check your API key or internet connection.'}`;
-      
-      if (error.message?.includes('API_KEY_INVALID') || error.message?.includes('invalid')) {
-        errorMsg = 'Your Gemini API key seems to be invalid. Please go to **Settings** and update it with a fresh key from Google AI Studio.';
-      } else if (error.message?.includes('API key not found')) {
-        errorMsg = 'API Key not found. Please ensure your key is correctly set in **Settings**.';
-      }
-      
-      setMessages([...newMessages, { role: 'assistant', content: errorMsg }]);
+      console.error('AI Error:', error);
+      setMessages([...newMessages, { role: 'assistant', content: "I'm having a little trouble thinking right now. Please try again in a moment!" }]);
     } finally {
       setIsLoading(false);
     }
@@ -121,7 +92,7 @@ export function AICoach({ profile, addRoutine }) {
     const { error } = await addRoutine(proposedRoutine);
     if (!error) {
       setIsSaved(true);
-      setMessages(prev => [...prev, { role: 'assistant', content: `Great! I've saved the "${proposedRoutine.name}" routine to your profile. You can find it in the Routines tab.` }]);
+      setMessages(prev => [...prev, { role: 'assistant', content: `Routine "${proposedRoutine.name}" saved!` }]);
     }
   };
 
@@ -138,19 +109,10 @@ export function AICoach({ profile, addRoutine }) {
           <Sparkles className="w-6 h-6 text-primary" />
         </div>
         <div>
-          <h1 className="text-xl font-bold">AI Coach</h1>
-          <p className="text-xs text-muted-foreground">Powered by Gemini</p>
+          <h1 className="text-xl font-bold">Free AI Coach</h1>
+          <p className="text-xs text-muted-foreground">Powered by Open Source AI</p>
         </div>
       </header>
-
-      {!activeApiKey && (
-        <div className="m-4 p-4 bg-primary/10 border border-primary/20 rounded-xl flex items-start gap-3 animate-pulse">
-          <Settings className="w-5 h-5 text-primary shrink-0" />
-          <p className="text-sm text-primary">
-            <strong>Ready to start?</strong> Go to **Settings** and paste your free Google Gemini API key to enable your personal fitness coach!
-          </p>
-        </div>
-      )}
 
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
         {messages.map((m, idx) => (
@@ -160,8 +122,8 @@ export function AICoach({ profile, addRoutine }) {
             </div>
             <div className={`max-w-[80%] rounded-2xl p-4 text-sm ${m.role === 'user' ? 'bg-primary text-white rounded-tr-none' : 'bg-card border border-border rounded-tl-none'}`}>
               {m.content.split('\n').map((line, i) => {
-                if (line.startsWith('```json') || line.startsWith('```')) return null;
-                if (line.trim() === '}' || (line.trim().startsWith('{') && line.includes('"name"'))) return null;
+                if (line.includes('{"name":') || line.includes('"exercises":')) return null;
+                if (line.startsWith('```')) return null;
                 return <p key={i} className="mb-2 last:mb-0 min-h-[1em] whitespace-pre-wrap">{line}</p>;
               })}
               
@@ -171,14 +133,6 @@ export function AICoach({ profile, addRoutine }) {
                     <Dumbbell className="w-4 h-4" />
                     <span>Proposed Routine: {proposedRoutine.name}</span>
                   </div>
-                  <div className="space-y-1 opacity-80">
-                    {proposedRoutine.exercises.map((ex, i) => (
-                      <div key={i} className="flex justify-between text-xs">
-                        <span>{ex.name}</span>
-                        <span>{ex.sets}x{ex.reps}</span>
-                      </div>
-                    ))}
-                  </div>
                   <button
                     onClick={handleSaveRoutine}
                     disabled={isSaved}
@@ -187,7 +141,7 @@ export function AICoach({ profile, addRoutine }) {
                     }`}
                   >
                     {isSaved ? <CheckCircle2 className="w-4 h-4" /> : <Save className="w-4 h-4" />}
-                    {isSaved ? 'Saved to Routines' : 'Save to My Routines'}
+                    {isSaved ? 'Saved!' : 'Save Routine'}
                   </button>
                 </div>
               )}
@@ -234,7 +188,7 @@ export function AICoach({ profile, addRoutine }) {
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask your coach for a routine..."
+            placeholder="Ask your coach anything..."
             className="flex-1 bg-secondary border border-border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-primary text-sm"
             disabled={isLoading}
           />
@@ -250,4 +204,5 @@ export function AICoach({ profile, addRoutine }) {
     </div>
   );
 }
+
 
