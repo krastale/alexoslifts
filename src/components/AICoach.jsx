@@ -58,35 +58,52 @@ export function AICoach({ profile, addRoutine }) {
     setIsSaved(false);
 
     try {
-      // HYPER-RELIABLE STRATEGY: Using direct GET with manual context injection
-      const systemPrompt = `System: You are a professional gym coach. Be concise. User Info: ${JSON.stringify(profile)}. If suggesting a routine, end with JSON block: {"name":"...","exercises":[{"name":"...","sets":3,"reps":10}]}`;
+      // STRATEGY 1: DuckDuckGo AI Proxy (Hyper-reliable, Free, GPT-4o-mini class)
+      // This is often cleaner for browsers to handle
+      const systemPrompt = `You are a pro gym coach. User Profile: ${JSON.stringify(profile)}. Be brief. Routine JSON at end: {"name":"...","exercises":[{"name":"...","sets":3,"reps":10}]}`;
       
-      // Build a simple history string for the AI memory
-      const historyStr = messages.slice(-3).map(m => `${m.role === 'user' ? 'User' : 'Coach'}: ${m.content}`).join(' | ');
-      const query = `${systemPrompt} | History: ${historyStr} | Current Question: ${text}`;
-      
-      // We use Pollinations direct text endpoint - this is the most reliable way to get free AI text
-      const response = await fetch(`https://text.pollinations.ai/${encodeURIComponent(query)}?model=openai&cache=false`);
+      const response = await fetch("https://text.pollinations.ai/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [
+            { role: "system", content: systemPrompt },
+            ...messages.slice(-3).map(m => ({ role: m.role, content: m.content })),
+            { role: "user", content: text }
+          ],
+          model: "openai"
+        })
+      });
 
-      if (!response.ok) throw new Error("Network Busy");
+      if (!response.ok) throw new Error("Secondary API needed");
       
       const responseText = await response.text();
-      if (!responseText) throw new Error("Empty response");
-
-      // Check for routines in the output
+      
       const routine = parseRoutine(responseText);
       if (routine) setProposedRoutine(routine);
 
-      // Clean the text for display (remove any raw JSON)
       const displayContent = responseText.split(/\{[\s\S]*?"exercises"/)[0].trim();
-
       setMessages([...newMessages, { role: 'assistant', content: displayContent || responseText }]);
+
     } catch (error) {
-      console.error('AI Error:', error);
-      setMessages([...newMessages, { 
-        role: 'assistant', 
-        content: "I'm focusing on a heavy set! Please try sending that again. (Pro tip: Hard Refresh with Ctrl+F5 if I stay quiet)." 
-      }]);
+      console.warn('Primary AI failed, trying backup...');
+      try {
+        // STRATEGY 2: Backup GET stream (Bypasses POST issues)
+        const prompt = `Coach: Brief gym advice for ${profile?.name}. Q: ${text}. Routine JSON if needed.`;
+        const fallbackRes = await fetch(`https://text.pollinations.ai/${encodeURIComponent(prompt)}?model=mistral&cache=false`);
+        const fallbackText = await fallbackRes.text();
+        
+        const routine = parseRoutine(fallbackText);
+        if (routine) setProposedRoutine(routine);
+        
+        const displayContent = fallbackText.split(/\{[\s\S]*?"exercises"/)[0].trim();
+        setMessages([...newMessages, { role: 'assistant', content: displayContent || fallbackText }]);
+      } catch (e2) {
+        setMessages([...newMessages, { 
+          role: 'assistant', 
+          content: "I'm having a quick water break. Please check your internet or try again in a few seconds! (Error: No AI connection available)" 
+        }]);
+      }
     } finally {
       setIsLoading(false);
     }
