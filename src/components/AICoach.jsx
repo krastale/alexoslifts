@@ -49,31 +49,34 @@ export function AICoach({ profile, addRoutine }) {
     setIsSaved(false);
 
     try {
-      // Plan B: Use Hugging Face Serverless Inference (Free, no key required for light usage)
-      // We use a powerful open-source model like Mistral or Llama
-      const systemPrompt = `You are a professional fitness coach. Keep answers concise. 
-      User: ${JSON.stringify(profile)}.
-      If recommending a routine, end with a JSON block: {"name": "...", "exercises": [{"name": "...", "sets": 3, "reps": 10}]}`;
+      // Using a slightly more reliable model path and adding better response checking
+      const systemPrompt = `You are a professional fitness coach. Keep answers short. If recommending a routine, use JSON: {"name": "...", "exercises": [{"name": "...", "sets": 3, "reps": 10}]}`;
+      const payload = {
+        inputs: `[INST] ${systemPrompt} ${text} [/INST]`,
+        parameters: { max_new_tokens: 400, return_full_text: false }
+      };
 
       const response = await fetch(
-        "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2",
+        "https://api-inference.huggingface.co/models/HuggingFaceH4/zephyr-7b-beta",
         {
           headers: { "Content-Type": "application/json" },
           method: "POST",
-          body: JSON.stringify({
-            inputs: `<s>[INST] ${systemPrompt} [/INST] ${text}</s>`,
-            parameters: { max_new_tokens: 500, temperature: 0.7 }
-          }),
+          body: JSON.stringify(payload),
         }
       );
 
-      const result = await response.json();
-      let responseText = result[0]?.generated_text || "";
+      if (!response.ok) throw new Error(`API Error: ${response.status}`);
       
-      // Remove the prompt from the response if Hugging Face returns it
-      if (responseText.includes('[/INST]')) {
-        responseText = responseText.split('[/INST]').pop().trim();
+      const result = await response.json();
+      let responseText = "";
+      
+      if (Array.isArray(result)) {
+        responseText = result[0]?.generated_text || "";
+      } else if (result.generated_text) {
+        responseText = result.generated_text;
       }
+
+      if (!responseText) throw new Error("Empty response");
 
       const routine = parseRoutine(responseText);
       if (routine) setProposedRoutine(routine);
@@ -81,7 +84,8 @@ export function AICoach({ profile, addRoutine }) {
       setMessages([...newMessages, { role: 'assistant', content: responseText }]);
     } catch (error) {
       console.error('AI Error:', error);
-      setMessages([...newMessages, { role: 'assistant', content: "I'm having a little trouble thinking right now. Please try again in a moment!" }]);
+      // Fallback message with more detail
+      setMessages([...newMessages, { role: 'assistant', content: "The AI is currently under heavy load. Please try one more time in 5 seconds!" }]);
     } finally {
       setIsLoading(false);
     }
