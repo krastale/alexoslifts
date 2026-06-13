@@ -99,6 +99,16 @@ export function useData() {
     return { data, error };
   };
 
+  const deleteHistory = async (id) => {
+    const { error } = await supabase
+      .from('history')
+      .delete()
+      .eq('id', id);
+    
+    if (!error) setHistory(history.filter(h => h.id !== id));
+    return { error };
+  };
+
   const addMeasurement = async (measurement) => {
     const { data, error } = await supabase
       .from('measurements')
@@ -176,6 +186,7 @@ export function useData() {
     deleteRoutine,
     history,
     addHistory,
+    deleteHistory,
     measurements,
     addMeasurement,
     deleteMeasurement,

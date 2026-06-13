@@ -16,7 +16,7 @@ function AppContent() {
   const { user, loading: authLoading } = useAuth();
   const { 
     profile, updateProfile, routines, addRoutine, deleteRoutine, 
-    history, addHistory, loading: dataLoading,
+    history, addHistory, deleteHistory, loading: dataLoading,
     measurements, addMeasurement, deleteMeasurement,
     photos, uploadPhoto, deletePhoto
   } = useData();
@@ -74,7 +74,7 @@ function AppContent() {
 
     switch (activeTab) {
       case 'dashboard':
-        return <Dashboard profile={profile} history={history} />;
+        return <Dashboard profile={profile} history={history} deleteHistory={deleteHistory} />;
       case 'routines':
         return <RoutineBuilder routines={routines} addRoutine={addRoutine} deleteRoutine={deleteRoutine} />;
       case 'progress':

@@ -1,8 +1,8 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { 
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, PieChart, Pie, Cell, BarChart, Bar 
 } from 'recharts';
-import { Trophy, Flame, Dumbbell, TrendingUp, Activity, PieChart as PieIcon } from 'lucide-react';
+import { Trophy, Flame, Dumbbell, TrendingUp, Activity, PieChart as PieIcon, Trash2, Calendar } from 'lucide-react';
 
 const MUSCLE_COLORS = {
   'chest': '#3b82f6',
@@ -27,14 +27,27 @@ const identifyMuscleGroup = (name = '') => {
   return 'other';
 };
 
-export function Dashboard({ profile, history }) {
+export function Dashboard({ profile, history, deleteHistory }) {
+  const [timeRange, setTimeRange] = useState('all');
+
+  const filteredHistory = useMemo(() => {
+    if (!history) return [];
+    if (timeRange === 'all') return history;
+    
+    const cutoff = new Date();
+    if (timeRange === '7d') cutoff.setDate(cutoff.getDate() - 7);
+    if (timeRange === '30d') cutoff.setDate(cutoff.getDate() - 30);
+    
+    return history.filter(w => new Date(w.date) >= cutoff);
+  }, [history, timeRange]);
+
   const stats = useMemo(() => {
-    if (!history || history.length === 0) return null;
+    if (!filteredHistory || filteredHistory.length === 0) return null;
 
     const muscleSplit = {};
     let totalVolume = 0;
 
-    history.forEach(workout => {
+    filteredHistory.forEach(workout => {
       workout.exercises?.forEach(ex => {
         const group = ex.category || identifyMuscleGroup(ex.name);
         const volume = ex.sets?.reduce((acc, set) => acc + (parseFloat(set.weight) * parseInt(set.reps) || 0), 0) || 0;
@@ -50,6 +63,7 @@ export function Dashboard({ profile, history }) {
       percentage: Math.round((value / totalVolume) * 100)
     })).sort((a, b) => b.value - a.value);
 
+    // Streak always uses full history for accuracy
     let streak = 0;
     const sortedDates = [...new Set(history.map(w => w.date.split('T')[0]))].sort().reverse();
     const today = new Date().toISOString().split('T')[0];
@@ -66,7 +80,7 @@ export function Dashboard({ profile, history }) {
       }
     }
 
-    const chartData = history.slice().reverse().map(workout => {
+    const chartData = filteredHistory.slice().reverse().map(workout => {
       const max1RM = Math.max(...(workout.exercises?.flatMap(ex => 
         ex.sets?.map(set => {
           const w = parseFloat(set.weight);
@@ -87,17 +101,38 @@ export function Dashboard({ profile, history }) {
       streak,
       chartData,
       muscleData,
-      lastWorkout: history[0]
+      lastWorkout: filteredHistory[0]
     };
-  }, [history]);
+  }, [filteredHistory, history]);
+
+  const handleDelete = async (id) => {
+    if (window.confirm('Delete this workout from your history?')) {
+      await deleteHistory(id);
+    }
+  };
 
   if (!stats) {
     return (
       <div className="p-6 space-y-6">
-        <h1 className="text-3xl font-bold">Welcome back, {profile?.name || 'Lifter'}!</h1>
-        <div className="bg-card border border-border p-8 rounded-2xl text-center space-y-4">
-          <Dumbbell className="w-12 h-12 text-muted-foreground mx-auto" />
-          <p className="text-muted-foreground">No workouts logged yet. Start your journey today!</p>
+        <div className="flex justify-between items-center">
+          <h1 className="text-3xl font-bold">Dashboard</h1>
+          <div className="flex gap-1 p-1 bg-secondary/50 rounded-xl">
+            {['7d', '30d', 'all'].map(range => (
+              <button
+                key={range}
+                onClick={() => setTimeRange(range)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase transition-all ${
+                  timeRange === range ? 'bg-primary text-white shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {range}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="bg-card border border-border p-12 rounded-3xl text-center space-y-4">
+          <Dumbbell className="w-12 h-12 text-muted-foreground mx-auto opacity-20" />
+          <p className="text-muted-foreground">No workouts found for this period.</p>
         </div>
       </div>
     );
@@ -105,9 +140,25 @@ export function Dashboard({ profile, history }) {
 
   return (
     <div className="p-6 space-y-8 pb-32 lg:pb-12">
-      <header className="space-y-1">
-        <h1 className="text-3xl font-bold tracking-tight">Welcome back, {profile?.name}</h1>
-        <p className="text-muted-foreground font-medium">Keep crushing those goals.</p>
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <h1 className="text-3xl font-bold tracking-tight">Welcome back, {profile?.name}</h1>
+          <p className="text-muted-foreground font-medium">Keep crushing those goals.</p>
+        </div>
+        
+        <div className="flex gap-1 p-1 bg-secondary/50 rounded-xl self-start">
+          {['7d', '30d', 'all'].map(range => (
+            <button
+              key={range}
+              onClick={() => setTimeRange(range)}
+              className={`px-4 py-2 rounded-lg text-xs font-bold uppercase transition-all ${
+                timeRange === range ? 'bg-primary text-white shadow-sm' : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {range === 'all' ? 'Always' : range}
+            </button>
+          ))}
+        </div>
       </header>
 
       {/* Quick Stats */}
@@ -137,7 +188,7 @@ export function Dashboard({ profile, history }) {
             <Trophy className="w-5 h-5" />
           </div>
           <div>
-            <p className="text-2xl font-black">{history.length}</p>
+            <p className="text-2xl font-black">{filteredHistory.length}</p>
             <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Workouts</p>
           </div>
         </div>
@@ -190,7 +241,7 @@ export function Dashboard({ profile, history }) {
                     dataKey="value"
                   >
                     {stats.muscleData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={MUSCLE_COLORS[entry.name] || MUSCLE_COLORS['Other']} />
+                      <Cell key={`cell-${index}`} fill={MUSCLE_COLORS[entry.name] || MUSCLE_COLORS['other']} />
                     ))}
                   </Pie>
                   <Tooltip />
@@ -201,7 +252,7 @@ export function Dashboard({ profile, history }) {
               {stats.muscleData.map((m) => (
                 <div key={m.name} className="space-y-1">
                   <div className="flex justify-between text-xs font-bold uppercase tracking-wider">
-                    <span>{m.name}</span>
+                    <span className="capitalize">{m.name}</span>
                     <span className="text-muted-foreground">{m.percentage}%</span>
                   </div>
                   <div className="h-1.5 w-full bg-secondary rounded-full overflow-hidden">
@@ -209,7 +260,7 @@ export function Dashboard({ profile, history }) {
                       className="h-full rounded-full transition-all duration-1000" 
                       style={{ 
                         width: `${m.percentage}%`, 
-                        backgroundColor: MUSCLE_COLORS[m.name] || MUSCLE_COLORS['Other'] 
+                        backgroundColor: MUSCLE_COLORS[m.name] || MUSCLE_COLORS['other'] 
                       }} 
                     />
                   </div>
@@ -224,26 +275,36 @@ export function Dashboard({ profile, history }) {
       <div className="space-y-4">
         <h2 className="text-sm font-black uppercase tracking-[0.2em] text-muted-foreground">Recent Activity</h2>
         <div className="space-y-3">
-          {history.slice(0, 5).map((workout) => (
-            <div key={workout.id} className="bg-card border border-border p-5 rounded-3xl flex justify-between items-center group hover:border-primary/50 transition-all">
+          {filteredHistory.slice(0, 5).map((workout) => (
+            <div key={workout.id} className="bg-card border border-border p-5 rounded-3xl flex justify-between items-center group hover:border-primary/50 transition-all relative">
               <div className="flex items-center gap-4">
                 <div className="p-3 bg-secondary rounded-2xl group-hover:bg-primary/10 transition-colors">
                   <Dumbbell className="w-6 h-6 text-muted-foreground group-hover:text-primary transition-colors" />
                 </div>
                 <div>
                   <p className="font-black uppercase tracking-tight">{workout.routine_name}</p>
-                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
+                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-2">
+                    <Calendar className="w-3 h-3" />
                     {new Date(workout.date).toLocaleDateString()} • {workout.exercises?.length || 0} EX
                   </p>
                 </div>
               </div>
-              <div className="text-right">
-                <p className="text-lg font-black text-primary">
-                  {Math.round(workout.exercises?.reduce((acc, ex) => 
-                    acc + (ex.sets?.reduce((sAcc, set) => sAcc + (parseFloat(set.weight) * parseInt(set.reps) || 0), 0) || 0)
-                  , 0) || 0).toLocaleString()}
-                </p>
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{profile?.units}</p>
+              <div className="flex items-center gap-6">
+                <div className="text-right">
+                  <p className="text-lg font-black text-primary">
+                    {Math.round(workout.exercises?.reduce((acc, ex) => 
+                      acc + (ex.sets?.reduce((sAcc, set) => sAcc + (parseFloat(set.weight) * parseInt(set.reps) || 0), 0) || 0)
+                    , 0) || 0).toLocaleString()}
+                  </p>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{profile?.units}</p>
+                </div>
+                <button 
+                  onClick={() => handleDelete(workout.id)}
+                  className="p-2 text-muted-foreground hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
+                  title="Delete workout"
+                >
+                  <Trash2 className="w-5 h-5" />
+                </button>
               </div>
             </div>
           ))}
@@ -252,3 +313,4 @@ export function Dashboard({ profile, history }) {
     </div>
   );
 }
+
