@@ -1,9 +1,81 @@
-import { useState, useEffect } from 'react';
-import { Check, Play, Save, X, Plus, Trash2, ChevronLeft, Timer } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { Check, Play, Save, X, Plus, Trash2, ChevronLeft, Timer, Calculator, Trophy, Info } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { RestMinigames } from './Minigames';
+import confetti from 'canvas-confetti';
 
-export function WorkoutLogger({ routine, onSave, onCancel }) {
+// Helper for 1RM calculation (Brzycki Formula)
+const calculate1RM = (weight, reps) => {
+  if (!weight || !reps || reps <= 0) return 0;
+  if (reps === 1) return weight;
+  return weight * (36 / (37 - reps));
+};
+
+function PlateCalculator({ weight, onClose }) {
+  const barWeight = 20; // Default Olympic Bar
+  const targetSide = (weight - barWeight) / 2;
+  const availablePlates = [25, 20, 15, 10, 5, 2.5, 1.25];
+  
+  let remaining = targetSide;
+  const platesNeeded = [];
+
+  availablePlates.forEach(plate => {
+    while (remaining >= plate) {
+      platesNeeded.push(plate);
+      remaining -= plate;
+    }
+  });
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-card border border-border w-full max-w-sm rounded-3xl p-6 space-y-6 shadow-2xl animate-in zoom-in-95 duration-200">
+        <div className="flex justify-between items-center">
+          <h3 className="text-xl font-bold flex items-center gap-2">
+            <Calculator className="w-5 h-5 text-primary" />
+            Plate Calculator
+          </h3>
+          <button onClick={onClose} className="p-2 hover:bg-secondary rounded-full transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="text-center space-y-1">
+          <p className="text-4xl font-black text-primary">{weight} <span className="text-sm font-normal text-muted-foreground uppercase tracking-widest">kg</span></p>
+          <p className="text-xs text-muted-foreground">Using 20kg Standard Barbell</p>
+        </div>
+
+        <div className="space-y-3">
+          <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Per Side:</p>
+          {platesNeeded.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {platesNeeded.map((p, i) => (
+                <div key={i} className={`px-4 py-2 rounded-xl font-bold border-b-4 transition-all ${
+                  p >= 20 ? 'bg-red-500 border-red-700 text-white' :
+                  p >= 10 ? 'bg-blue-500 border-blue-700 text-white' :
+                  p >= 5 ? 'bg-yellow-500 border-yellow-700 text-black' :
+                  'bg-secondary border-border text-foreground'
+                }`}>
+                  {p} kg
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-center py-4 bg-secondary/50 rounded-xl italic">Only the bar!</p>
+          )}
+        </div>
+
+        <button 
+          onClick={onClose}
+          className="w-full py-4 bg-primary text-white font-black rounded-2xl shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all"
+        >
+          GOT IT
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export function WorkoutLogger({ routine, history, onSave, onCancel }) {
   const { user } = useAuth();
   const [workout, setWorkout] = useState({
     routineName: routine.name,
@@ -16,10 +88,25 @@ export function WorkoutLogger({ routine, onSave, onCancel }) {
 
   const [startTime] = useState(Date.now());
   const [elapsed, setElapsed] = useState(0);
-  
-  // Rest Timer State
   const [isResting, setIsResting] = useState(false);
   const [restTimeLeft, setRestTimeLeft] = useState(0);
+  const [showPlateCalc, setShowPlateCalc] = useState(null); // stores {weight}
+
+  // PR Logic: Calculate bests from history
+  const personalBests = useMemo(() => {
+    const bests = {};
+    history?.forEach(session => {
+      session.exercises.forEach(ex => {
+        ex.sets.forEach(set => {
+          const w = parseFloat(set.weight);
+          if (w > (bests[ex.name] || 0)) {
+            bests[ex.name] = w;
+          }
+        });
+      });
+    });
+    return bests;
+  }, [history]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -28,7 +115,6 @@ export function WorkoutLogger({ routine, onSave, onCancel }) {
     return () => clearInterval(timer);
   }, [startTime]);
 
-  // Rest Timer effect
   useEffect(() => {
     let restInterval;
     if (isResting && restTimeLeft > 0) {
@@ -60,15 +146,32 @@ export function WorkoutLogger({ routine, onSave, onCancel }) {
 
   const toggleSet = (exIdx, setIdx) => {
     const updated = { ...workout };
-    const willBeCompleted = !updated.exercises[exIdx].sets[setIdx].completed;
-    updated.exercises[exIdx].sets[setIdx].completed = willBeCompleted;
-    setWorkout(updated);
-
+    const set = updated.exercises[exIdx].sets[setIdx];
+    const willBeCompleted = !set.completed;
+    
     if (willBeCompleted) {
-      // Start rest timer (e.g., 60 seconds)
+      const weight = parseFloat(set.weight);
+      const exerciseName = updated.exercises[exIdx].name;
+      
+      // PR Detection
+      if (weight > 0 && weight > (personalBests[exerciseName] || 0)) {
+        confetti({
+          particleCount: 150,
+          spread: 70,
+          origin: { y: 0.6 },
+          colors: ['#3b82f6', '#ffffff', '#60a5fa']
+        });
+        set.isPR = true;
+      }
+      
       setIsResting(true);
       setRestTimeLeft(60);
+    } else {
+      set.isPR = false;
     }
+
+    set.completed = willBeCompleted;
+    setWorkout(updated);
   };
 
   const addSet = (exIdx) => {
@@ -92,6 +195,10 @@ export function WorkoutLogger({ routine, onSave, onCancel }) {
 
   return (
     <div className="min-h-screen bg-background pb-40">
+      {showPlateCalc && (
+        <PlateCalculator weight={showPlateCalc} onClose={() => setShowPlateCalc(null)} />
+      )}
+
       <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-md border-b border-border p-4">
         <div className="max-w-3xl mx-auto flex justify-between items-center">
           <div className="flex items-center gap-3">
@@ -113,102 +220,128 @@ export function WorkoutLogger({ routine, onSave, onCancel }) {
       </div>
 
       <div className="max-w-3xl mx-auto p-4 space-y-8 mt-4">
-        {workout.exercises.map((ex, exIdx) => (
-          <div key={exIdx} className="space-y-4">
-            <h2 className="text-xl font-bold text-primary flex items-center gap-2">
-              <Play className="w-5 h-5 fill-primary" />
-              {ex.name}
-            </h2>
-            
-            <div className="space-y-2">
-              <div className="grid grid-cols-12 gap-2 px-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                <div className="col-span-1 text-center">Set</div>
-                <div className="col-span-4 text-center">Previous</div>
-                <div className="col-span-3 text-center">Weight</div>
-                <div className="col-span-2 text-center">Reps</div>
-                <div className="col-span-2 text-center">Done</div>
+        {workout.exercises.map((ex, exIdx) => {
+          const best = personalBests[ex.name] || 0;
+          return (
+            <div key={exIdx} className="space-y-4">
+              <div className="flex justify-between items-end">
+                <h2 className="text-xl font-bold text-primary flex items-center gap-2">
+                  <Play className="w-5 h-5 fill-primary" />
+                  {ex.name}
+                </h2>
+                {best > 0 && (
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase flex items-center gap-1">
+                    <Trophy className="w-3 h-3 text-yellow-500" />
+                    Best: {best}kg
+                  </p>
+                )}
               </div>
+              
+              <div className="space-y-2">
+                <div className="grid grid-cols-12 gap-2 px-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                  <div className="col-span-1 text-center">#</div>
+                  <div className="col-span-3 text-center">1RM Est</div>
+                  <div className="col-span-3 text-center">Weight</div>
+                  <div className="col-span-3 text-center">Reps</div>
+                  <div className="col-span-2 text-center">Done</div>
+                </div>
 
-              {ex.sets.map((set, setIdx) => (
-                <div 
-                  key={setIdx} 
-                  className={`grid grid-cols-12 gap-2 items-center p-2 rounded-xl transition-all ${
-                    set.completed ? 'bg-primary/5 opacity-60' : 'bg-card border border-border'
-                  }`}
-                >
-                  <div className="col-span-1 text-center font-bold text-sm">
-                    {setIdx + 1}
-                  </div>
-                  <div className="col-span-4 text-center text-xs text-muted-foreground">
-                    -
-                  </div>
-                  <div className="col-span-3">
-                    <input
-                      type="number"
-                      placeholder="0"
-                      className="w-full bg-secondary border border-border rounded-lg py-2 text-center text-sm outline-none focus:ring-1 focus:ring-primary"
-                      value={set.weight}
-                      onChange={(e) => updateSet(exIdx, setIdx, 'weight', e.target.value)}
-                    />
-                  </div>
-                  <div className="col-span-2">
-                    <input
-                      type="number"
-                      placeholder="0"
-                      className="w-full bg-secondary border border-border rounded-lg py-2 text-center text-sm outline-none focus:ring-1 focus:ring-primary"
-                      value={set.reps}
-                      onChange={(e) => updateSet(exIdx, setIdx, 'reps', e.target.value)}
-                    />
-                  </div>
-                  <div className="col-span-2 flex justify-center">
-                    <button
-                      onClick={() => toggleSet(exIdx, setIdx)}
-                      className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
-                        set.completed 
-                          ? 'bg-green-500 text-white' 
-                          : 'bg-secondary text-muted-foreground'
+                {ex.sets.map((set, setIdx) => {
+                  const est1RM = calculate1RM(parseFloat(set.weight), parseInt(set.reps));
+                  return (
+                    <div 
+                      key={setIdx} 
+                      className={`grid grid-cols-12 gap-2 items-center p-2 rounded-2xl transition-all ${
+                        set.completed ? 'bg-primary/5 opacity-60' : 'bg-card border border-border shadow-sm'
                       }`}
                     >
-                      <Check className="w-5 h-5" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-              
-              <button
-                onClick={() => addSet(exIdx)}
-                className="w-full py-2 bg-secondary/50 hover:bg-secondary rounded-lg text-sm font-medium transition-all"
-              >
-                + Add Set
-              </button>
+                      <div className="col-span-1 text-center font-bold text-sm">
+                        {setIdx + 1}
+                      </div>
+                      <div className="col-span-3 text-center">
+                        <span className="text-[10px] font-mono text-muted-foreground">
+                          {est1RM > 0 ? `${est1RM.toFixed(1)}kg` : '-'}
+                        </span>
+                      </div>
+                      <div className="col-span-3 relative group">
+                        <input
+                          type="number"
+                          placeholder="0"
+                          className="w-full bg-secondary border border-border rounded-xl py-2.5 text-center text-sm font-bold outline-none focus:ring-2 focus:ring-primary"
+                          value={set.weight}
+                          onChange={(e) => updateSet(exIdx, setIdx, 'weight', e.target.value)}
+                        />
+                        <button 
+                          onClick={() => setShowPlateCalc(parseFloat(set.weight) || 0)}
+                          className="absolute -top-2 -right-1 bg-background border border-border p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <Calculator className="w-3 h-3 text-primary" />
+                        </button>
+                      </div>
+                      <div className="col-span-3">
+                        <input
+                          type="number"
+                          placeholder="0"
+                          className="w-full bg-secondary border border-border rounded-xl py-2.5 text-center text-sm font-bold outline-none focus:ring-2 focus:ring-primary"
+                          value={set.reps}
+                          onChange={(e) => updateSet(exIdx, setIdx, 'reps', e.target.value)}
+                        />
+                      </div>
+                      <div className="col-span-2 flex justify-center relative">
+                        {set.isPR && (
+                          <div className="absolute -top-3 -right-1 animate-bounce">
+                            <Trophy className="w-5 h-5 text-yellow-500 fill-yellow-500 shadow-xl" />
+                          </div>
+                        )}
+                        <button
+                          onClick={() => toggleSet(exIdx, setIdx)}
+                          className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${
+                            set.completed 
+                              ? 'bg-green-500 text-white shadow-lg shadow-green-500/20' 
+                              : 'bg-secondary text-muted-foreground hover:bg-secondary/80'
+                          }`}
+                        >
+                          <Check className="w-6 h-6" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+                
+                <button
+                  onClick={() => addSet(exIdx)}
+                  className="w-full py-3 bg-secondary/30 hover:bg-secondary/50 border border-dashed border-border rounded-2xl text-xs font-bold uppercase tracking-widest text-muted-foreground transition-all mt-2"
+                >
+                  + Add Set
+                </button>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Rest Timer Overlay */}
       {isResting && (
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/95 backdrop-blur-lg border-t border-border z-20 animate-in slide-in-from-bottom-full duration-300 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.5)]">
-          <div className="max-w-3xl mx-auto space-y-4">
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/95 backdrop-blur-xl border-t border-border z-20 animate-in slide-in-from-bottom-full duration-500 shadow-[0_-15px_50px_-15px_rgba(0,0,0,0.6)]">
+          <div className="max-w-3xl mx-auto space-y-6">
             <div className="flex justify-between items-center">
-              <div className="flex items-center gap-3">
-                <div className="bg-primary/20 p-2 rounded-xl text-primary animate-pulse">
-                  <Timer className="w-6 h-6" />
+              <div className="flex items-center gap-4">
+                <div className="bg-primary/20 p-3 rounded-2xl text-primary animate-pulse">
+                  <Timer className="w-8 h-8" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-lg">Rest Time</h3>
-                  <p className="text-primary font-mono text-2xl">{formatTime(restTimeLeft)}</p>
+                  <h3 className="font-black text-xl uppercase tracking-tighter italic">Rest Time</h3>
+                  <p className="text-primary font-mono text-3xl leading-none">{formatTime(restTimeLeft)}</p>
                 </div>
               </div>
               <button 
                 onClick={() => setIsResting(false)}
-                className="bg-secondary px-4 py-2 rounded-lg text-sm font-bold hover:bg-secondary/80"
+                className="bg-secondary px-6 py-3 rounded-2xl text-sm font-black uppercase tracking-widest hover:bg-secondary/80 transition-all active:scale-95"
               >
                 Skip
               </button>
             </div>
 
-            {/* Embed the Minigames */}
             <RestMinigames user={user} />
           </div>
         </div>

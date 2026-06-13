@@ -52,6 +52,7 @@ function AppContent() {
     return (
       <WorkoutLogger 
         routine={activeWorkout} 
+        history={history}
         onSave={async (workout) => {
           await addHistory(workout);
           setActiveWorkout(null);
