@@ -1,11 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Sparkles, Dumbbell, Activity, Utensils, Save, CheckCircle2, RefreshCcw } from 'lucide-react';
+import { Send, Bot, User, Sparkles, Dumbbell, Activity, Utensils, Save, CheckCircle2, Trash2 } from 'lucide-react';
 
 export function AICoach({ profile, addRoutine }) {
   const [messages, setMessages] = useState([
     {
       role: 'assistant',
-      content: `Hi ${profile?.username || profile?.name || 'there'}! I'm your AI fitness coach. I am now using a high-reliability connection. I can create plans, fix form, or give advice. What's on your mind?`
+      content: `Hi ${profile?.username || profile?.name || 'there'}! I'm your AI fitness coach. I am now using a high-priority anonymous connection. I can create plans, fix form, or give advice. What's on your mind?`
     }
   ]);
   const [input, setInput] = useState('');
@@ -24,7 +24,6 @@ export function AICoach({ profile, addRoutine }) {
 
   const parseRoutine = (text) => {
     try {
-      // Find the last JSON block in the response
       const matches = text.match(/\{[\s\S]*?"exercises"[\s\S]*?\}/g);
       if (matches) {
         const rawJson = matches[matches.length - 1]; 
@@ -48,7 +47,7 @@ export function AICoach({ profile, addRoutine }) {
   };
 
   const handleSend = async (text = input) => {
-    if (!text.trim()) return;
+    if (!text.trim() || isLoading) return;
     
     const newMessages = [...messages, { role: 'user', content: text }];
     setMessages(newMessages);
@@ -58,27 +57,26 @@ export function AICoach({ profile, addRoutine }) {
     setIsSaved(false);
 
     try {
-      // STRATEGY 1: DuckDuckGo AI Proxy (Hyper-reliable, Free, GPT-4o-mini class)
-      // This is often cleaner for browsers to handle
-      const systemPrompt = `You are a pro gym coach. User Profile: ${JSON.stringify(profile)}. Be brief. Routine JSON at end: {"name":"...","exercises":[{"name":"...","sets":3,"reps":10}]}`;
+      // PREVENTING 429 ERRORS: Using anonymous GET with randomized seed and cache-busting
+      const systemPrompt = `You are a gym coach. User:${profile?.name}. Briefly answer. For routines end with JSON:{"name":"...","exercises":[{"name":"...","sets":3,"reps":10}]}`;
       
-      const response = await fetch("https://text.pollinations.ai/", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: [
-            { role: "system", content: systemPrompt },
-            ...messages.slice(-3).map(m => ({ role: m.role, content: m.content })),
-            { role: "user", content: text }
-          ],
-          model: "openai"
-        })
-      });
+      // Inject history (max 2 messages to keep URL short and stable)
+      const recentHistory = messages.slice(-2).map(m => `${m.role === 'user' ? 'U' : 'C'}: ${m.content.slice(0, 100)}`).join(' | ');
+      const query = `${systemPrompt} | History: ${recentHistory} | Q: ${text}`;
+      
+      const seed = Math.floor(Math.random() * 1000000);
+      const apiUrl = `https://text.pollinations.ai/${encodeURIComponent(query)}?model=openai&cache=false&seed=${seed}&no-queue=true`;
 
-      if (!response.ok) throw new Error("Secondary API needed");
+      const response = await fetch(apiUrl);
+
+      if (!response.ok) {
+        if (response.status === 429) throw new Error("Rate limit");
+        throw new Error("Server busy");
+      }
       
       const responseText = await response.text();
-      
+      if (!responseText) throw new Error("Empty");
+
       const routine = parseRoutine(responseText);
       if (routine) setProposedRoutine(routine);
 
@@ -86,26 +84,24 @@ export function AICoach({ profile, addRoutine }) {
       setMessages([...newMessages, { role: 'assistant', content: displayContent || responseText }]);
 
     } catch (error) {
-      console.warn('Primary AI failed, trying backup...');
-      try {
-        // STRATEGY 2: Backup GET stream (Bypasses POST issues)
-        const prompt = `Coach: Brief gym advice for ${profile?.name}. Q: ${text}. Routine JSON if needed.`;
-        const fallbackRes = await fetch(`https://text.pollinations.ai/${encodeURIComponent(prompt)}?model=mistral&cache=false`);
-        const fallbackText = await fallbackRes.text();
-        
-        const routine = parseRoutine(fallbackText);
-        if (routine) setProposedRoutine(routine);
-        
-        const displayContent = fallbackText.split(/\{[\s\S]*?"exercises"/)[0].trim();
-        setMessages([...newMessages, { role: 'assistant', content: displayContent || fallbackText }]);
-      } catch (e2) {
-        setMessages([...newMessages, { 
-          role: 'assistant', 
-          content: "I'm having a quick water break. Please check your internet or try again in a few seconds! (Error: No AI connection available)" 
-        }]);
-      }
+      console.error('AI Error:', error);
+      const errorMsg = error.message === "Rate limit" 
+        ? "Slow down! Please wait 10 seconds before your next message so I can catch my breath."
+        : "I'm having a quick water break. Please try clicking Send again in 5 seconds!";
+      
+      setMessages([...newMessages, { role: 'assistant', content: errorMsg }]);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const clearChat = () => {
+    if (window.confirm("Clear conversation history?")) {
+      setMessages([{
+        role: 'assistant',
+        content: "History cleared. How else can I help you today?"
+      }]);
+      setProposedRoutine(null);
     }
   };
 
@@ -120,8 +116,8 @@ export function AICoach({ profile, addRoutine }) {
 
   const suggestions = [
     { icon: <Dumbbell className="w-4 h-4" />, text: "3-day split plan" },
-    { icon: <Activity className="w-4 h-4" />, text: "Squat form check" },
-    { icon: <Utensils className="w-4 h-4" />, text: "Protein meal ideas" },
+    { icon: <Activity className="w-4 h-4" />, text: "Squat form" },
+    { icon: <Utensils className="w-4 h-4" />, text: "High protein diet" },
   ];
 
   return (
@@ -132,10 +128,17 @@ export function AICoach({ profile, addRoutine }) {
             <Sparkles className="w-6 h-6 text-primary" />
           </div>
           <div>
-            <h1 className="text-xl font-bold">Alexos Coach</h1>
-            <p className="text-[10px] font-black text-primary uppercase tracking-[0.2em]">v3.0 ULTIMATE</p>
+            <h1 className="text-xl font-bold">AI Coach</h1>
+            <p className="text-[10px] font-black text-primary uppercase tracking-[0.2em]">v3.6 HIGH-STABILITY</p>
           </div>
         </div>
+        <button 
+          onClick={clearChat}
+          className="p-2 text-muted-foreground hover:text-red-500 transition-colors rounded-lg hover:bg-red-500/10"
+          title="Clear Chat"
+        >
+          <Trash2 className="w-5 h-5" />
+        </button>
       </header>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
@@ -205,7 +208,8 @@ export function AICoach({ profile, addRoutine }) {
               <button
                 key={idx}
                 onClick={() => handleSend(s.text)}
-                className="whitespace-nowrap flex items-center gap-2 bg-secondary/50 hover:bg-secondary border border-border px-4 py-2.5 rounded-xl text-xs font-bold transition-all"
+                disabled={isLoading}
+                className="whitespace-nowrap flex items-center gap-2 bg-secondary/50 hover:bg-secondary border border-border px-4 py-2.5 rounded-xl text-xs font-bold transition-all disabled:opacity-50"
               >
                 {s.icon}
                 {s.text}
@@ -222,8 +226,8 @@ export function AICoach({ profile, addRoutine }) {
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask your coach anything..."
-            className="flex-1 bg-secondary border border-border rounded-2xl px-5 py-4 outline-none focus:ring-2 focus:ring-primary text-sm shadow-inner"
+            placeholder={isLoading ? "I'm thinking..." : "Ask your coach anything..."}
+            className="flex-1 bg-secondary border border-border rounded-2xl px-5 py-4 outline-none focus:ring-2 focus:ring-primary text-sm shadow-inner disabled:opacity-50"
             disabled={isLoading}
           />
           <button
