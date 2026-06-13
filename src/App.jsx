@@ -92,7 +92,7 @@ function AppContent() {
           />
         );
       case 'coach':
-        return <AICoach profile={profile} />;
+        return <AICoach profile={profile} addRoutine={addRoutine} />;
       case 'community':
         return <Community profile={profile} />;
       case 'settings':
