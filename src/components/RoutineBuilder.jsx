@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Trash2, Dumbbell, Save, X, Share2, Download, Library, User, Globe, Lock, Edit2 } from 'lucide-react';
+import { Plus, Trash2, Dumbbell, Save, X, Share2, Download, Library, User, Globe, Lock, Edit2, ChevronUp, ChevronDown } from 'lucide-react';
 
 export const EXERCISE_CATEGORIES = [
   'arms', 'shoulders', 'abs', 'chest', 'back', 'legs', 'gluteus', 'forearms'
@@ -66,6 +66,20 @@ export function RoutineBuilder({ routines, addRoutine, deleteRoutine, updateRout
     const target = editingRoutine || newRoutine;
     const updatedExercises = [...target.exercises];
     updatedExercises[index][field] = value;
+    const updated = { ...target, exercises: updatedExercises };
+    editingRoutine ? setEditingRoutine(updated) : setNewRoutine(updated);
+  };
+
+  const moveExercise = (index, direction) => {
+    const target = editingRoutine || newRoutine;
+    const updatedExercises = [...target.exercises];
+    const newIndex = direction === 'up' ? index - 1 : index + 1;
+    
+    if (newIndex < 0 || newIndex >= updatedExercises.length) return;
+    
+    const [movedItem] = updatedExercises.splice(index, 1);
+    updatedExercises.splice(newIndex, 0, movedItem);
+    
     const updated = { ...target, exercises: updatedExercises };
     editingRoutine ? setEditingRoutine(updated) : setNewRoutine(updated);
   };
@@ -184,12 +198,30 @@ export function RoutineBuilder({ routines, addRoutine, deleteRoutine, updateRout
               <label className="block text-sm font-medium">Exercises</label>
               {routineToEdit.exercises.map((ex, idx) => (
                 <div key={idx} className="p-4 bg-secondary/50 border border-border rounded-xl space-y-4 relative">
-                  <button 
-                    onClick={() => handleRemoveExercise(idx)}
-                    className="absolute top-4 right-4 text-red-500 hover:text-red-400"
-                  >
-                    <Trash2 className="w-5 h-5" />
-                  </button>
+                  <div className="absolute top-4 right-4 flex gap-2">
+                    <div className="flex flex-col gap-1">
+                      <button 
+                        onClick={() => moveExercise(idx, 'up')}
+                        disabled={idx === 0}
+                        className="p-1 text-muted-foreground hover:text-primary disabled:opacity-0 transition-all"
+                      >
+                        <ChevronUp className="w-4 h-4" />
+                      </button>
+                      <button 
+                        onClick={() => moveExercise(idx, 'down')}
+                        disabled={idx === routineToEdit.exercises.length - 1}
+                        className="p-1 text-muted-foreground hover:text-primary disabled:opacity-0 transition-all"
+                      >
+                        <ChevronDown className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <button 
+                      onClick={() => handleRemoveExercise(idx)}
+                      className="text-red-500 hover:text-red-400 self-center"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                    </button>
+                  </div>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="md:col-span-2">
