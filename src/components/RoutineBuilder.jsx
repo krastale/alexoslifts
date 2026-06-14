@@ -253,7 +253,10 @@ export function RoutineBuilder({ routines, addRoutine, deleteRoutine, updateRout
                           type="number"
                           className="w-full bg-secondary border border-border rounded-lg py-2 px-3 outline-none focus:ring-1 focus:ring-primary"
                           value={ex.sets}
-                          onChange={(e) => handleExerciseChange(idx, 'sets', parseInt(e.target.value) || 0)}
+                          onChange={(e) => {
+                            const val = e.target.value === '' ? '' : parseInt(e.target.value);
+                            handleExerciseChange(idx, 'sets', val);
+                          }}
                         />
                       </div>
                       <div>

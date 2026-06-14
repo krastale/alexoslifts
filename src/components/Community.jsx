@@ -182,6 +182,7 @@ export function Community({ profile, addRoutine }) {
     setLoading(true);
     try {
       // Fetch where I am user_1 (sender) or user_2 (receiver)
+      // Using explicit FK column hints for reliability
       const { data, error } = await supabase
         .from('friendships')
         .select(`
@@ -191,7 +192,12 @@ export function Community({ profile, addRoutine }) {
         `)
         .or(`user_id_1.eq.${profile.id},user_id_2.eq.${profile.id}`);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Database join error:', error);
+        throw error;
+      }
+
+      console.log('Friendship data fetched:', data);
 
       if (data) {
         const accepted = [];
