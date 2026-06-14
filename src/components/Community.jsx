@@ -550,7 +550,7 @@ export function Community({ profile, addRoutine }) {
                       </button>
                     </div>
                     <div className="space-y-1.5 border-t border-border/50 pt-3">
-                      {routine.exercises.slice(0, 3).map((ex, i) => (
+                      {routine.exercises.map((ex, i) => (
                         <div key={i} className="flex justify-between text-xs text-muted-foreground">
                           <span>{ex.name}</span>
                           <span>{ex.sets}x{ex.reps}</span>

@@ -332,7 +332,7 @@ export function RoutineBuilder({ routines, addRoutine, deleteRoutine, updateRout
               </div>
               
               <div className="space-y-2 mb-6">
-                {routine.exercises.slice(0, 3).map((ex, i) => (
+                {routine.exercises.map((ex, i) => (
                   <div key={i} className="text-sm flex justify-between items-center text-muted-foreground">
                     <div className="flex items-center gap-2">
                       <span className="w-1.5 h-1.5 rounded-full bg-primary/40"></span>
@@ -344,9 +344,6 @@ export function RoutineBuilder({ routines, addRoutine, deleteRoutine, updateRout
                     </div>
                   </div>
                 ))}
-                {routine.exercises.length > 3 && (
-                  <p className="text-xs text-muted-foreground italic">+{routine.exercises.length - 3} more...</p>
-                )}
               </div>
 
               <button 
@@ -386,7 +383,7 @@ export function RoutineBuilder({ routines, addRoutine, deleteRoutine, updateRout
               </div>
               
               <div className="space-y-2 mb-6">
-                {routine.exercises.slice(0, 3).map((ex, i) => (
+                {routine.exercises.map((ex, i) => (
                   <div key={i} className="text-sm flex justify-between items-center text-muted-foreground">
                     <div className="flex items-center gap-2">
                       <span className="w-1.5 h-1.5 rounded-full bg-primary/40"></span>
@@ -398,9 +395,6 @@ export function RoutineBuilder({ routines, addRoutine, deleteRoutine, updateRout
                     </div>
                   </div>
                 ))}
-                {routine.exercises.length > 3 && (
-                  <p className="text-xs text-muted-foreground italic">+{routine.exercises.length - 3} more...</p>
-                )}
               </div>
             </div>
           ))}
