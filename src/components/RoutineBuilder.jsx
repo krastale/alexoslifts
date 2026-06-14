@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Trash2, Dumbbell, Save, X, Share2, Download, Library, User, Globe, Lock } from 'lucide-react';
+import { Plus, Trash2, Dumbbell, Save, X, Share2, Download, Library, User, Globe, Lock, Edit2 } from 'lucide-react';
 
 export const EXERCISE_CATEGORIES = [
   'arms', 'shoulders', 'abs', 'chest', 'back', 'legs', 'gluteus', 'forearms'
@@ -35,22 +35,63 @@ export const LIBRARY_ROUTINES = [
   }
 ];
 
-export function RoutineBuilder({ routines, addRoutine, deleteRoutine }) {
+export function RoutineBuilder({ routines, addRoutine, deleteRoutine, updateRoutine }) {
   const [activeTab, setActiveTab] = useState('mine'); // 'mine' or 'library'
   const [isAdding, setIsAdding] = useState(false);
+  const [editingRoutine, setEditingRoutine] = useState(null);
   const [newRoutine, setNewRoutine] = useState({
     name: '',
     is_public: true,
     exercises: [{ name: '', sets: 3, reps: 10, category: 'arms' }]
   });
 
+  const handleAddExercise = () => {
+    const target = editingRoutine || newRoutine;
+    const updated = {
+      ...target,
+      exercises: [...target.exercises, { name: '', sets: 3, reps: 10, category: 'arms' }]
+    };
+    editingRoutine ? setEditingRoutine(updated) : setNewRoutine(updated);
+  };
+
+  const handleRemoveExercise = (index) => {
+    const target = editingRoutine || newRoutine;
+    const updatedExercises = [...target.exercises];
+    updatedExercises.splice(index, 1);
+    const updated = { ...target, exercises: updatedExercises };
+    editingRoutine ? setEditingRoutine(updated) : setNewRoutine(updated);
+  };
+
+  const handleExerciseChange = (index, field, value) => {
+    const target = editingRoutine || newRoutine;
+    const updatedExercises = [...target.exercises];
+    updatedExercises[index][field] = value;
+    const updated = { ...target, exercises: updatedExercises };
+    editingRoutine ? setEditingRoutine(updated) : setNewRoutine(updated);
+  };
+
+  const handleSave = async () => {
+    const target = editingRoutine || newRoutine;
+    if (target.name && target.exercises.every(ex => ex.name)) {
+      if (editingRoutine?.id) {
+        await updateRoutine(editingRoutine);
+        setEditingRoutine(null);
+      } else {
+        await addRoutine(target);
+        setNewRoutine({ name: '', is_public: true, exercises: [{ name: '', sets: 3, reps: 10, category: 'arms' }] });
+        setIsAdding(false);
+      }
+      setActiveTab('mine');
+    }
+  };
+
   const importLibraryRoutine = (routine) => {
-    addRoutine({
+    setNewRoutine({
       name: routine.name,
       exercises: routine.exercises,
       is_public: false
     });
-    setActiveTab('mine');
+    setIsAdding(true);
   };
 
   const handleShare = (routine) => {
@@ -67,11 +108,13 @@ export function RoutineBuilder({ routines, addRoutine, deleteRoutine }) {
     }
   };
 
+  const routineToEdit = editingRoutine || newRoutine;
+
   return (
     <div className="p-6 space-y-6 pb-24 lg:pb-6">
       <header className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Routines</h1>
-        {!isAdding && (
+        {!isAdding && !editingRoutine && (
           <button
             onClick={() => setIsAdding(true)}
             className="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg flex items-center gap-2 font-bold transition-all"
@@ -82,7 +125,7 @@ export function RoutineBuilder({ routines, addRoutine, deleteRoutine }) {
         )}
       </header>
 
-      {!isAdding && (
+      {!isAdding && !editingRoutine && (
         <div className="flex gap-2 p-1 bg-secondary/50 rounded-xl overflow-x-auto no-scrollbar w-full max-w-sm">
           <button 
             onClick={() => setActiveTab('mine')} 
@@ -99,11 +142,11 @@ export function RoutineBuilder({ routines, addRoutine, deleteRoutine }) {
         </div>
       )}
 
-      {isAdding ? (
+      {(isAdding || editingRoutine) ? (
         <div className="bg-card border border-border p-6 rounded-2xl space-y-6">
           <div className="flex justify-between items-center">
-            <h2 className="text-xl font-bold">Create Routine</h2>
-            <button onClick={() => setIsAdding(false)} className="text-muted-foreground hover:text-foreground">
+            <h2 className="text-xl font-bold">{editingRoutine ? 'Edit Routine' : 'Create Routine'}</h2>
+            <button onClick={() => { setIsAdding(false); setEditingRoutine(null); }} className="text-muted-foreground hover:text-foreground">
               <X className="w-6 h-6" />
             </button>
           </div>
@@ -116,27 +159,30 @@ export function RoutineBuilder({ routines, addRoutine, deleteRoutine }) {
                   type="text"
                   className="w-full bg-secondary border border-border rounded-lg py-2.5 px-4 outline-none focus:ring-2 focus:ring-primary transition-all"
                   placeholder="e.g., Upper Body / Push Day"
-                  value={newRoutine.name}
-                  onChange={(e) => setNewRoutine({ ...newRoutine, name: e.target.value })}
+                  value={routineToEdit.name}
+                  onChange={(e) => editingRoutine ? setEditingRoutine({ ...editingRoutine, name: e.target.value }) : setNewRoutine({ ...newRoutine, name: e.target.value })}
                 />
               </div>
               <div className="w-fit">
                 <label className="block text-sm font-medium mb-2">Privacy</label>
                 <button
-                  onClick={() => setNewRoutine({ ...newRoutine, is_public: !newRoutine.is_public })}
+                  onClick={() => {
+                    const updated = { ...routineToEdit, is_public: !routineToEdit.is_public };
+                    editingRoutine ? setEditingRoutine(updated) : setNewRoutine(updated);
+                  }}
                   className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border transition-all font-bold text-sm ${
-                    newRoutine.is_public ? 'bg-green-500/10 border-green-500/50 text-green-500' : 'bg-secondary border-border text-muted-foreground'
+                    routineToEdit.is_public ? 'bg-green-500/10 border-green-500/50 text-green-500' : 'bg-secondary border-border text-muted-foreground'
                   }`}
                 >
-                  {newRoutine.is_public ? <Globe className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
-                  {newRoutine.is_public ? 'Public' : 'Private'}
+                  {routineToEdit.is_public ? <Globe className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
+                  {routineToEdit.is_public ? 'Public' : 'Private'}
                 </button>
               </div>
             </div>
 
             <div className="space-y-4">
               <label className="block text-sm font-medium">Exercises</label>
-              {newRoutine.exercises.map((ex, idx) => (
+              {routineToEdit.exercises.map((ex, idx) => (
                 <div key={idx} className="p-4 bg-secondary/50 border border-border rounded-xl space-y-4 relative">
                   <button 
                     onClick={() => handleRemoveExercise(idx)}
@@ -175,16 +221,17 @@ export function RoutineBuilder({ routines, addRoutine, deleteRoutine }) {
                           type="number"
                           className="w-full bg-secondary border border-border rounded-lg py-2 px-3 outline-none focus:ring-1 focus:ring-primary"
                           value={ex.sets}
-                          onChange={(e) => handleExerciseChange(idx, 'sets', parseInt(e.target.value))}
+                          onChange={(e) => handleExerciseChange(idx, 'sets', parseInt(e.target.value) || 0)}
                         />
                       </div>
                       <div>
-                        <label className="block text-xs text-muted-foreground mb-1">Reps</label>
+                        <label className="block text-xs text-muted-foreground mb-1">Reps per Set</label>
                         <input
-                          type="number"
+                          type="text"
                           className="w-full bg-secondary border border-border rounded-lg py-2 px-3 outline-none focus:ring-1 focus:ring-primary"
+                          placeholder="e.g. 10 or 10,8,6"
                           value={ex.reps}
-                          onChange={(e) => handleExerciseChange(idx, 'reps', parseInt(e.target.value))}
+                          onChange={(e) => handleExerciseChange(idx, 'reps', e.target.value)}
                         />
                       </div>
                     </div>
@@ -207,7 +254,7 @@ export function RoutineBuilder({ routines, addRoutine, deleteRoutine }) {
             className="w-full bg-primary hover:bg-primary/90 text-white font-bold py-3 rounded-lg shadow-lg shadow-primary/20 transition-all flex items-center justify-center gap-2"
           >
             <Save className="w-5 h-5" />
-            Save Routine
+            {editingRoutine ? 'Update Routine' : 'Save Routine'}
           </button>
         </div>
       ) : activeTab === 'mine' ? (
@@ -225,6 +272,13 @@ export function RoutineBuilder({ routines, addRoutine, deleteRoutine }) {
                   </div>
                 </div>
                 <div className="flex gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                  <button 
+                    onClick={() => setEditingRoutine(routine)}
+                    className="p-2 bg-secondary text-primary hover:bg-primary/20 rounded-lg transition-colors"
+                    title="Edit Routine"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                  </button>
                   <button 
                     onClick={() => handleShare(routine)}
                     className="p-2 bg-secondary text-primary hover:bg-primary/20 rounded-lg transition-colors"

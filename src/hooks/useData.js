@@ -72,6 +72,24 @@ export function useData() {
     return { data, error };
   };
 
+  const updateRoutine = async (routine) => {
+    const { data, error } = await supabase
+      .from('routines')
+      .update({ 
+        name: routine.name, 
+        exercises: routine.exercises, 
+        is_public: routine.is_public 
+      })
+      .eq('id', routine.id)
+      .select()
+      .single();
+    
+    if (data) {
+      setRoutines(routines.map(r => r.id === routine.id ? data : r));
+    }
+    return { data, error };
+  };
+
   const deleteRoutine = async (id) => {
     const { error } = await supabase
       .from('routines')
@@ -183,6 +201,7 @@ export function useData() {
     updateProfile,
     routines,
     addRoutine,
+    updateRoutine,
     deleteRoutine,
     history,
     addHistory,

@@ -80,11 +80,19 @@ export function WorkoutLogger({ routine, history, onSave, onCancel }) {
   const [workout, setWorkout] = useState({
     routineName: routine.name,
     date: new Date().toISOString(),
-    exercises: routine.exercises.map(ex => ({
-      name: ex.name,
-      category: ex.category || 'arms',
-      sets: Array.from({ length: ex.sets }, () => ({ weight: '', reps: ex.reps, rpe: '', completed: false }))
-    }))
+    exercises: routine.exercises.map(ex => {
+      const repPattern = String(ex.reps).split(',').map(r => parseInt(r.trim()) || 10);
+      return {
+        name: ex.name,
+        category: ex.category || 'arms',
+        sets: Array.from({ length: ex.sets }, (_, i) => ({ 
+          weight: '', 
+          reps: repPattern[i] || repPattern[repPattern.length - 1] || 10, 
+          rpe: '', 
+          completed: false 
+        }))
+      };
+    })
   });
 
   const [startTime] = useState(Date.now());

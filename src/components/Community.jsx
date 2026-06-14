@@ -244,15 +244,21 @@ export function Community({ profile, addRoutine }) {
   };
 
   const searchUsers = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     if (!searchQuery.trim()) return;
     setLoading(true);
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('profiles')
       .select('id, username')
-      .ilike('username', `%${searchQuery}%`)
+      .ilike('username', `%${searchQuery.trim()}%`)
       .neq('id', profile.id)
       .limit(10);
+    
+    if (error) {
+      console.error('Search error:', error);
+      alert('Error searching for users. Please try again.');
+    }
+    
     setSearchResults(data || []);
     setLoading(false);
   };

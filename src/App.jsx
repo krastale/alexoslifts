@@ -15,7 +15,7 @@ import { Community } from './components/Community';
 function AppContent() {
   const { user, loading: authLoading } = useAuth();
   const { 
-    profile, updateProfile, routines, addRoutine, deleteRoutine, 
+    profile, updateProfile, routines, addRoutine, updateRoutine, deleteRoutine, 
     history, addHistory, deleteHistory, loading: dataLoading,
     measurements, addMeasurement, deleteMeasurement,
     photos, uploadPhoto, deletePhoto
@@ -76,7 +76,7 @@ function AppContent() {
       case 'dashboard':
         return <Dashboard profile={profile} history={history} deleteHistory={deleteHistory} />;
       case 'routines':
-        return <RoutineBuilder routines={routines} addRoutine={addRoutine} deleteRoutine={deleteRoutine} />;
+        return <RoutineBuilder routines={routines} addRoutine={addRoutine} updateRoutine={updateRoutine} deleteRoutine={deleteRoutine} />;
       case 'progress':
         return (
           <Progress
