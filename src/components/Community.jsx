@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { supabase } from '../supabaseClient';
-import { Users, UserPlus, MessageCircle, Send, Trophy, Loader2, Check, X, Activity, Heart, Dumbbell, RefreshCw, Globe, Download, Flame, BarChart3 } from 'lucide-react';
+import { Users, UserPlus, MessageCircle, Send, Trophy, Loader2, Check, X, Activity, Heart, Dumbbell, RefreshCw, Globe, Download, Flame, BarChart3, Calendar } from 'lucide-react';
 
 export function Community({ profile, addRoutine }) {
   const [activeTab, setActiveTab] = useState('feed'); // feed, friends, add, chat
