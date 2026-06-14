@@ -32,12 +32,17 @@ export function useData() {
       if (photosRes.data) {
         // Sign URLs for private photos
         const photosWithUrls = await Promise.all(photosRes.data.map(async (p) => {
-          const { data } = await supabase.storage
-            .from('progress-photos')
-            .createSignedUrl(p.storage_path, 3600); // 1 hour link
-          return { ...p, url: data?.signedUrl };
+          try {
+            const { data } = await supabase.storage
+              .from('progress-photos')
+              .createSignedUrl(p.storage_path, 3600); // 1 hour link
+            return { ...p, url: data?.signedUrl, date: p.date || p.created_at };
+          } catch (e) {
+            console.error('Error signing photo URL:', e);
+            return { ...p, url: null, date: p.date || p.created_at };
+          }
         }));
-        setPhotos(photosWithUrls);
+        setPhotos(photosWithUrls.filter(p => p.url)); // Only show photos that have valid URLs
       }
     } catch (error) {
       console.error('Error fetching data:', error);

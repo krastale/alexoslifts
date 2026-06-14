@@ -303,8 +303,8 @@ export function Progress({ profile, updateProfile, history, measurements, addMea
 
         {photos.length > 0 ? (
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            {photos.map(photo => (
-              <div key={photo.id} className="aspect-square bg-card border border-border rounded-xl overflow-hidden relative group">
+            {photos.map((photo, idx) => (
+              <div key={photo.id || `photo-${idx}`} className="aspect-square bg-card border border-border rounded-xl overflow-hidden relative group">
                 <img 
                   src={photo.url} 
                   alt="Progress" 
@@ -319,8 +319,8 @@ export function Progress({ profile, updateProfile, history, measurements, addMea
                   </button>
                 </div>
                 <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur px-2 py-1 rounded text-[10px] text-white flex items-center gap-1">
-                  <Calendar className="w-3 h-3" />
-                  {new Date(photo.date).toLocaleDateString()}
+                  <CalendarIcon className="w-3 h-3" />
+                  {photo.date ? new Date(photo.date).toLocaleDateString() : 'New'}
                 </div>
               </div>
             ))}
