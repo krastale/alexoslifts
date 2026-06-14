@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
-import { Users, UserPlus, MessageCircle, Send, Trophy, Loader2, Check, X, Activity, Heart, Dumbbell } from 'lucide-react';
+import { Users, UserPlus, MessageCircle, Send, Trophy, Loader2, Check, X, Activity, Heart, Dumbbell, RefreshCw, Globe, Download } from 'lucide-react';
 
 export function Community({ profile, addRoutine }) {
   const [activeTab, setActiveTab] = useState('feed'); // feed, friends, add, chat
@@ -177,36 +177,43 @@ export function Community({ profile, addRoutine }) {
   }, [activeChat, profile?.id]);
 
   const fetchFriendsAndRequests = async () => {
+    if (!profile?.id) return;
     setLoading(true);
-    // Fetch where I am user_1 or user_2
-    const { data, error } = await supabase
-      .from('friendships')
-      .select(`
-        id, status, user_id_1, user_id_2,
-        user1:profiles!friendships_user_id_1_fkey(id, username),
-        user2:profiles!friendships_user_id_2_fkey(id, username)
-      `)
-      .or(`user_id_1.eq.${profile.id},user_id_2.eq.${profile.id}`);
+    try {
+      // Simplified select to avoid potential FK name issues
+      const { data, error } = await supabase
+        .from('friendships')
+        .select(`
+          id, status, user_id_1, user_id_2,
+          user1:profiles!user_id_1(id, username),
+          user2:profiles!user_id_2(id, username)
+        `)
+        .or(`user_id_1.eq.${profile.id},user_id_2.eq.${profile.id}`);
 
-    if (data) {
-      const accepted = [];
-      const pending = [];
-      data.forEach(f => {
-        const isUser1 = f.user_id_1 === profile.id;
-        const friendProfile = isUser1 ? f.user2 : f.user1;
-        if (!friendProfile) return;
+      if (error) throw error;
 
-        if (f.status === 'accepted') {
-          accepted.push({ ...friendProfile, friendship_id: f.id });
-        } else if (f.status === 'pending' && !isUser1) {
-          // Only show pending if I am the receiver (user_2)
-          pending.push({ ...friendProfile, friendship_id: f.id });
-        }
-      });
-      setFriends(accepted);
-      setPendingRequests(pending);
+      if (data) {
+        const accepted = [];
+        const pending = [];
+        data.forEach(f => {
+          const isUser1 = f.user_id_1 === profile.id;
+          const friendProfile = isUser1 ? f.user2 : f.user1;
+          if (!friendProfile) return;
+
+          if (f.status === 'accepted') {
+            accepted.push({ ...friendProfile, friendship_id: f.id });
+          } else if (f.status === 'pending' && !isUser1) {
+            pending.push({ ...friendProfile, friendship_id: f.id });
+          }
+        });
+        setFriends(accepted);
+        setPendingRequests(pending);
+      }
+    } catch (err) {
+      console.error('Error fetching friends:', err);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const fetchFriendScores = async () => {
@@ -303,19 +310,34 @@ export function Community({ profile, addRoutine }) {
   return (
     <div className="flex flex-col h-[calc(100vh-80px)] lg:h-[calc(100vh-64px)] pb-24 lg:pb-0 bg-background">
       <header className="p-4 border-b border-border bg-background/80 backdrop-blur-md sticky top-0 z-10">
-        <h1 className="text-xl font-bold mb-4">Community</h1>
+        <div className="flex justify-between items-center mb-4">
+          <h1 className="text-xl font-bold">Community</h1>
+          <button 
+            onClick={() => { fetchFriendsAndRequests(); fetchFeed(); }}
+            className={`p-2 hover:bg-secondary rounded-lg transition-all ${loading ? 'animate-spin text-primary' : 'text-muted-foreground'}`}
+            title="Refresh"
+          >
+            <RefreshCw className="w-5 h-5" />
+          </button>
+        </div>
         {!activeChat && !viewingFriendRoutines ? (
           <div className="flex gap-2 p-1 bg-secondary/50 rounded-xl overflow-x-auto no-scrollbar">
             <button onClick={() => setActiveTab('feed')} className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-bold transition-all ${activeTab === 'feed' ? 'bg-primary text-white shadow-md' : 'text-muted-foreground'}`}>
               <Activity className="w-4 h-4" /> Feed
             </button>
-            <button onClick={() => setActiveTab('friends')} className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-bold transition-all relative ${activeTab === 'friends' ? 'bg-primary text-white shadow-md' : 'text-muted-foreground'}`}>
+            <button 
+              onClick={() => { setActiveTab('friends'); fetchFriendsAndRequests(); }} 
+              className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-bold transition-all relative ${activeTab === 'friends' ? 'bg-primary text-white shadow-md' : 'text-muted-foreground'}`}
+            >
               <Users className="w-4 h-4" /> Friends
               {Object.values(newMessages).some(count => count > 0) && (
                 <span className="absolute top-1 right-2 w-2 h-2 bg-red-500 rounded-full border border-background"></span>
               )}
             </button>
-            <button onClick={() => setActiveTab('add')} className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-bold transition-all ${activeTab === 'add' ? 'bg-primary text-white shadow-md' : 'text-muted-foreground'}`}>
+            <button 
+              onClick={() => { setActiveTab('add'); fetchFriendsAndRequests(); }} 
+              className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-bold transition-all ${activeTab === 'add' ? 'bg-primary text-white shadow-md' : 'text-muted-foreground'}`}
+            >
               <UserPlus className="w-4 h-4" /> Add
               {pendingRequests.length > 0 && <span className="bg-red-500 text-white w-4 h-4 rounded-full text-[10px] flex items-center justify-center">{pendingRequests.length}</span>}
             </button>
