@@ -26,52 +26,63 @@ export function Community({ profile, addRoutine }) {
   const leaderboardData = useMemo(() => {
     if (activeTab !== 'leaderboards') return null;
 
-    const startOfWeek = new Date();
-    startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
-    startOfWeek.setHours(0,0,0,0);
+    try {
+      const startOfWeek = new Date();
+      startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
+      startOfWeek.setHours(0,0,0,0);
+      const startTs = startOfWeek.getTime();
 
-    const userStats = {};
-    // Filter out any null profiles to prevent crashes
-    const allProfiles = [profile, ...friends].filter(Boolean);
+      const userStats = {};
+      const allProfiles = [profile, ...friends].filter(Boolean);
 
-    allProfiles.forEach(p => {
-      if (p.id) {
-        userStats[p.id] = { 
-          profile: p, 
-          volume: 0, 
-          workouts: 0, 
-          claps: 0 
-        };
-      }
-    });
-
-    // Volume & Workouts
-    feed.forEach(item => {
-      if (item.type === 'workout' && new Date(item.timestamp) >= startOfWeek) {
-        if (item.user_id && userStats[item.user_id]) {
-          userStats[item.user_id].workouts += 1;
-          const vol = item.exercises?.reduce((acc, ex) => 
-            acc + (ex.sets?.reduce((sAcc, set) => sAcc + (parseFloat(set.weight) * parseInt(set.reps) || 0), 0) || 0)
-          , 0) || 0;
-          userStats[item.user_id].volume += vol;
+      allProfiles.forEach(p => {
+        if (p?.id) {
+          userStats[p.id] = { 
+            profile: p, 
+            volume: 0, 
+            workouts: 0, 
+            claps: 0 
+          };
         }
-      }
-    });
+      });
 
-    // Claps
-    feedInteractions.forEach(m => {
-      if (new Date(m.created_at) >= startOfWeek) {
-        if (m.receiver_id && userStats[m.receiver_id]) {
-          userStats[m.receiver_id].claps += 1;
+      // Volume & Workouts
+      (feed || []).forEach(item => {
+        if (!item) return;
+        const itemTs = item.timestamp || (item.date ? new Date(item.date).getTime() : 0);
+        if (item.type === 'workout' && itemTs >= startTs) {
+          if (item.user_id && userStats[item.user_id]) {
+            userStats[item.user_id].workouts += 1;
+            const vol = item.exercises?.reduce((acc, ex) => 
+              acc + (ex.sets?.reduce((sAcc, set) => sAcc + (parseFloat(set.weight) * parseInt(set.reps) || 0), 0) || 0)
+            , 0) || 0;
+            userStats[item.user_id].volume += vol;
+          }
         }
-      }
-    });
+      });
 
-    return {
-      volume: Object.values(userStats).sort((a, b) => b.volume - a.volume),
-      consistency: Object.values(userStats).sort((a, b) => b.workouts - a.workouts),
-      popular: Object.values(userStats).sort((a, b) => b.claps - a.claps)
-    };
+      // Claps
+      (feedInteractions || []).forEach(m => {
+        if (!m) return;
+        const createdTs = m.created_at ? new Date(m.created_at).getTime() : 0;
+        if (createdTs >= startTs) {
+          if (m.receiver_id && userStats[m.receiver_id]) {
+            userStats[m.receiver_id].claps += 1;
+          }
+        }
+      });
+
+      const statsArray = Object.values(userStats);
+
+      return {
+        volume: [...statsArray].sort((a, b) => (b.volume || 0) - (a.volume || 0)),
+        consistency: [...statsArray].sort((a, b) => (b.workouts || 0) - (a.workouts || 0)),
+        popular: [...statsArray].sort((a, b) => (b.claps || 0) - (a.claps || 0))
+      };
+    } catch (err) {
+      console.error('Leaderboard error:', err);
+      return { volume: [], consistency: [], popular: [] };
+    }
   }, [activeTab, feed, feedInteractions, friends, profile]);
 
   // Friend Profile View
@@ -615,7 +626,7 @@ export function Community({ profile, addRoutine }) {
                 {leaderboardData.consistency.map((stat, i) => (
                   <div key={stat.profile?.id || i} className="p-4 flex justify-between items-center">
                     <div className="flex items-center gap-3">
-                      <span className={`w-6 h-6 flex items-center justify-center rounded-full text-xs font-black ${i === 0 ? (activeTab === 'leaderboards' ? (stat.claps !== undefined ? 'bg-red-500 text-white' : 'bg-blue-500 text-white') : 'bg-secondary') : 'bg-secondary text-muted-foreground'}`}>{i + 1}</span>
+                      <span className={`w-6 h-6 flex items-center justify-center rounded-full text-xs font-black ${i === 0 ? 'bg-blue-500 text-white' : 'bg-secondary text-muted-foreground'}`}>{i + 1}</span>
                       <span className="font-bold">{stat.profile?.username || 'Lifter'}</span>
                     </div>
                     <span className="font-black text-blue-500">{stat.workouts} Workouts</span>
