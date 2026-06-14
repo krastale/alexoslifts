@@ -12,6 +12,7 @@ export function Community({ profile, addRoutine }) {
   const [friendScores, setFriendScores] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
+  const [postInput, setPostInput] = useState('');
   const [loading, setLoading] = useState(false);
   
   // Chat state
@@ -111,39 +112,68 @@ export function Community({ profile, addRoutine }) {
 
   const fetchFeed = async () => {
     const friendIds = friends.map(f => f.id);
-    const { data } = await supabase
-      .from('history')
-      .select('*')
-      .in('user_id', friendIds)
-      .order('date', { ascending: false })
-      .limit(30);
+    const allIds = [...friendIds, profile.id];
+
+    const [historyRes, postsRes] = await Promise.all([
+      supabase.from('history').select('*').in('user_id', allIds).order('date', { ascending: false }).limit(20),
+      supabase.from('posts').select('*').in('user_id', allIds).order('created_at', { ascending: false }).limit(20)
+    ]);
     
-    if (data) {
-      const feedWithProfiles = data.map(item => {
-        const friend = friends.find(f => f.id === item.user_id);
-        return { ...item, profile: friend };
+    const combinedFeed = [];
+    
+    if (historyRes.data) {
+      historyRes.data.forEach(item => {
+        const userProfile = item.user_id === profile.id ? profile : friends.find(f => f.id === item.user_id);
+        combinedFeed.push({ ...item, type: 'workout', profile: userProfile, timestamp: new Date(item.date).getTime() });
       });
-      setFeed(feedWithProfiles);
-      
-      const { data: interactionData } = await supabase
-        .from('messages')
-        .select('*')
-        .like('content', 'FEED_LIKE:%');
+    }
+
+    if (postsRes.data) {
+      postsRes.data.forEach(item => {
+        const userProfile = item.user_id === profile.id ? profile : friends.find(f => f.id === item.user_id);
+        combinedFeed.push({ ...item, type: 'post', profile: userProfile, timestamp: new Date(item.created_at).getTime() });
+      });
+    }
+
+    combinedFeed.sort((a, b) => b.timestamp - a.timestamp);
+    setFeed(combinedFeed);
+    
+    const { data: interactionData } = await supabase
+      .from('messages')
+      .select('*')
+      .or(`content.like.FEED_LIKE:%,content.like.POST_LIKE:%`);
         
-      if (interactionData) {
-        setFeedInteractions(interactionData);
-      }
+    if (interactionData) {
+      setFeedInteractions(interactionData);
     }
   };
 
-  const handleClap = async (historyItem) => {
-    const alreadyClapped = feedInteractions.find(m => m.sender_id === profile.id && m.content === `FEED_LIKE:${historyItem.id}`);
+  const handlePost = async (e) => {
+    e.preventDefault();
+    if (!postInput.trim()) return;
+
+    const { error } = await supabase
+      .from('posts')
+      .insert([{
+        user_id: profile.id,
+        content: postInput.trim()
+      }]);
+
+    if (!error) {
+      setPostInput('');
+      fetchFeed();
+    }
+  };
+
+  const handleClap = async (item) => {
+    const typePrefix = item.type === 'workout' ? 'FEED_LIKE' : 'POST_LIKE';
+    const alreadyClapped = feedInteractions.find(m => m.sender_id === profile.id && m.content === `${typePrefix}:${item.id}`);
     if (alreadyClapped) return;
 
     const newClap = {
       sender_id: profile.id,
-      receiver_id: historyItem.user_id,
-      content: `FEED_LIKE:${historyItem.id}`,
+      receiver_id: item.user_id,
+      content: `${typePrefix}:${item.id}`,
       created_at: new Date().toISOString()
     };
     
@@ -387,48 +417,78 @@ export function Community({ profile, addRoutine }) {
 
       <div className="flex-1 overflow-y-auto">
         {!activeChat && !viewingFriendRoutines && activeTab === 'feed' && (
-          // ... (rest of feed rendering is unchanged, I'll keep it simple in this call)
           <div className="p-4 space-y-6">
+            {/* Post Input */}
+            <form onSubmit={handlePost} className="bg-card border border-border p-4 rounded-3xl shadow-sm space-y-3">
+              <div className="flex gap-3">
+                <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center text-primary font-bold shrink-0">
+                  {profile?.username?.charAt(0).toUpperCase()}
+                </div>
+                <textarea
+                  value={postInput}
+                  onChange={(e) => setPostInput(e.target.value)}
+                  placeholder="What's on your mind?"
+                  className="w-full bg-secondary border-none rounded-2xl p-3 text-sm outline-none focus:ring-2 focus:ring-primary min-h-[80px] resize-none"
+                />
+              </div>
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  disabled={!postInput.trim()}
+                  className="bg-primary text-white px-6 py-2 rounded-full font-bold text-sm hover:bg-primary/90 transition-all disabled:opacity-50 flex items-center gap-2"
+                >
+                  <Send className="w-4 h-4" />
+                  Post
+                </button>
+              </div>
+            </form>
+
             {feed.length === 0 ? (
               <div className="text-center text-muted-foreground p-12 bg-secondary/20 rounded-3xl border border-dashed border-border space-y-4">
                 <Activity className="w-10 h-10 mx-auto text-primary/50" />
-                <p className="text-sm">Your feed is quiet.<br/>Add friends to see their workouts!</p>
+                <p className="text-sm">Your feed is quiet.<br/>Add friends to see their updates!</p>
                 <button onClick={() => setActiveTab('add')} className="text-primary font-bold hover:underline">Find Friends</button>
               </div>
             ) : (
               feed.map(item => {
-                const totalVolume = Math.round(item.exercises?.reduce((acc, ex) => 
+                const isWorkout = item.type === 'workout';
+                const totalVolume = isWorkout ? Math.round(item.exercises?.reduce((acc, ex) => 
                   acc + (ex.sets?.reduce((sAcc, set) => sAcc + (parseFloat(set.weight) * parseInt(set.reps) || 0), 0) || 0)
-                , 0) || 0);
+                , 0) || 0) : 0;
                 
-                const claps = feedInteractions.filter(m => m.content === `FEED_LIKE:${item.id}`);
+                const typePrefix = isWorkout ? 'FEED_LIKE' : 'POST_LIKE';
+                const claps = feedInteractions.filter(m => m.content === `${typePrefix}:${item.id}`);
                 const hasClapped = claps.some(m => m.sender_id === profile.id);
 
                 return (
-                  <div key={item.id} className="bg-card border border-border p-5 rounded-3xl space-y-4 shadow-sm hover:border-primary/50 transition-colors">
+                  <div key={`${item.type}-${item.id}`} className="bg-card border border-border p-5 rounded-3xl space-y-4 shadow-sm hover:border-primary/50 transition-colors">
                     <div className="flex justify-between items-start">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-primary/20 rounded-full flex items-center justify-center text-primary font-bold">
-                          {item.profile?.username?.charAt(0)?.toUpperCase()}
+                          {item.profile?.username?.charAt(0).toUpperCase()}
                         </div>
                         <div>
-                          <h3 className="font-bold">{item.profile?.username}</h3>
+                          <h3 className="font-bold">{item.profile?.username || 'Lifter'}</h3>
                           <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
-                            {new Date(item.date).toLocaleDateString()}
+                            {new Date(item.timestamp).toLocaleDateString()} at {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </p>
                         </div>
                       </div>
                       <div className="p-2 bg-secondary rounded-xl text-primary">
-                        <Dumbbell className="w-4 h-4" />
+                        {isWorkout ? <Dumbbell className="w-4 h-4" /> : <MessageCircle className="w-4 h-4" />}
                       </div>
                     </div>
                     
-                    <div className="space-y-1">
-                      <p className="font-black text-lg tracking-tight uppercase">{item.routine_name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        Crushed {item.exercises?.length || 0} exercises, lifting a total of <span className="font-bold text-foreground">{totalVolume.toLocaleString()} {profile?.units}</span>.
-                      </p>
-                    </div>
+                    {isWorkout ? (
+                      <div className="space-y-1">
+                        <p className="font-black text-lg tracking-tight uppercase">{item.routine_name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          Crushed {item.exercises?.length || 0} exercises, lifting a total of <span className="font-bold text-foreground">{totalVolume.toLocaleString()} {profile?.units}</span>.
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-foreground whitespace-pre-wrap">{item.content}</p>
+                    )}
 
                     <div className="pt-2 border-t border-border flex gap-4">
                       <button 

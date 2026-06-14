@@ -89,7 +89,10 @@ export function Progress({ profile, updateProfile, history, measurements, addMea
     const file = e.target.files?.[0];
     if (file) {
       setIsUploading(true);
-      await uploadPhoto(file);
+      const { error } = await uploadPhoto(file);
+      if (error) {
+        alert(`Failed to upload photo: ${error.message}`);
+      }
       setIsUploading(false);
     }
   };

@@ -145,37 +145,44 @@ export function useData() {
   };
 
   const uploadPhoto = async (file, caption = '') => {
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${Date.now()}.${fileExt}`;
-    const filePath = `${user.id}/${fileName}`;
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}.${fileExt}`;
+      const filePath = `${user.id}/${fileName}`;
 
-    // 1. Upload to Storage
-    const { error: uploadError } = await supabase.storage
-      .from('progress-photos')
-      .upload(filePath, file);
+      // 1. Upload to Storage
+      const { error: uploadError } = await supabase.storage
+        .from('progress-photos')
+        .upload(filePath, file);
 
-    if (uploadError) return { error: uploadError };
+      if (uploadError) throw uploadError;
 
-    // 2. Save metadata to DB
-    const { data, error: dbError } = await supabase
-      .from('progress_photos')
-      .insert([{
-        user_id: user.id,
-        storage_path: filePath,
-        caption
-      }])
-      .select()
-      .single();
+      // 2. Save metadata to DB
+      const { data, error: dbError } = await supabase
+        .from('progress_photos')
+        .insert([{
+          user_id: user.id,
+          storage_path: filePath,
+          caption,
+          date: new Date().toISOString()
+        }])
+        .select()
+        .single();
 
-    if (dbError) return { error: dbError };
+      if (dbError) throw dbError;
 
-    // 3. Update local state with signed URL
-    const { data: signedData } = await supabase.storage
-      .from('progress-photos')
-      .createSignedUrl(filePath, 3600);
+      // 3. Update local state with signed URL
+      const { data: signedData } = await supabase.storage
+        .from('progress-photos')
+        .createSignedUrl(filePath, 3600);
 
-    setPhotos([{ ...data, url: signedData?.signedUrl }, ...photos]);
-    return { data, error: null };
+      const newPhoto = { ...data, url: signedData?.signedUrl };
+      setPhotos([newPhoto, ...photos]);
+      return { data: newPhoto, error: null };
+    } catch (error) {
+      console.error('Upload photo error:', error);
+      return { data: null, error };
+    }
   };
 
   const deletePhoto = async (photo) => {
