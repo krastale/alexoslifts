@@ -21,6 +21,16 @@ export function Community({ profile, addRoutine }) {
 
   const [newMessages, setNewMessages] = useState({}); // { friendId: count }
 
+  // Friend Profile View
+  const [viewingFriendRoutines, setViewingFriendRoutines] = useState(null);
+  const [friendRoutines, setFriendRoutines] = useState([]);
+
+  useEffect(() => {
+    if (profile?.id) {
+      fetchFriendsAndRequests();
+    }
+  }, [profile?.id]);
+
   // Global message subscription for notifications
   useEffect(() => {
     if (!profile?.id) return;
@@ -341,7 +351,7 @@ export function Community({ profile, addRoutine }) {
                     <div className="flex justify-between items-start">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-primary/20 rounded-full flex items-center justify-center text-primary font-bold">
-                          {item.profile?.username?.charAt(0).toUpperCase()}
+                          {item.profile?.username?.charAt(0)?.toUpperCase()}
                         </div>
                         <div>
                           <h3 className="font-bold">{item.profile?.username}</h3>
@@ -399,7 +409,7 @@ export function Community({ profile, addRoutine }) {
                   <div className="flex justify-between items-center">
                     <h3 className="font-bold text-lg flex items-center gap-2">
                       <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center text-primary text-xs">
-                        {friend.username?.charAt(0).toUpperCase()}
+                        {friend.username?.charAt(0)?.toUpperCase()}
                       </div>
                       {friend.username}
                     </h3>
