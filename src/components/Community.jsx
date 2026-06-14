@@ -19,20 +19,57 @@ export function Community({ profile, addRoutine }) {
   const [messageInput, setMessageInput] = useState('');
   const messagesEndRef = useRef(null);
 
-  // Friend Profile View
-  const [viewingFriendRoutines, setViewingFriendRoutines] = useState(null);
-  const [friendRoutines, setFriendRoutines] = useState([]);
+  const [newMessages, setNewMessages] = useState({}); // { friendId: count }
 
+  // Global message subscription for notifications
   useEffect(() => {
-    if (profile?.id) {
-      fetchFriendsAndRequests();
-    }
-  }, [profile?.id]);
+    if (!profile?.id) return;
+
+    const subscription = supabase
+      .channel('global_messages')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'messages',
+        filter: `receiver_id=eq.${profile.id}`
+      }, payload => {
+        if (!activeChat || activeChat.id !== payload.new.sender_id) {
+          setNewMessages(prev => ({
+            ...prev,
+            [payload.new.sender_id]: (prev[payload.new.sender_id] || 0) + 1
+          }));
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(subscription);
+    };
+  }, [profile?.id, activeChat]);
 
   useEffect(() => {
     if (friends.length > 0) {
       fetchFriendScores();
       fetchFeed();
+
+      // Real-time feed subscription
+      const subscription = supabase
+        .channel('public_feed')
+        .on('postgres_changes', { 
+          event: 'INSERT', 
+          schema: 'public', 
+          table: 'history'
+        }, payload => {
+          const friend = friends.find(f => f.id === payload.new.user_id);
+          if (friend) {
+            setFeed(prev => [{ ...payload.new, profile: friend }, ...prev]);
+          }
+        })
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(subscription);
+      };
     }
   }, [friends]);
 
@@ -256,8 +293,11 @@ export function Community({ profile, addRoutine }) {
             <button onClick={() => setActiveTab('feed')} className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-bold transition-all ${activeTab === 'feed' ? 'bg-primary text-white shadow-md' : 'text-muted-foreground'}`}>
               <Activity className="w-4 h-4" /> Feed
             </button>
-            <button onClick={() => setActiveTab('friends')} className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-bold transition-all ${activeTab === 'friends' ? 'bg-primary text-white shadow-md' : 'text-muted-foreground'}`}>
+            <button onClick={() => setActiveTab('friends')} className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-bold transition-all relative ${activeTab === 'friends' ? 'bg-primary text-white shadow-md' : 'text-muted-foreground'}`}>
               <Users className="w-4 h-4" /> Friends
+              {Object.values(newMessages).some(count => count > 0) && (
+                <span className="absolute top-1 right-2 w-2 h-2 bg-red-500 rounded-full border border-background"></span>
+              )}
             </button>
             <button onClick={() => setActiveTab('add')} className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-bold transition-all ${activeTab === 'add' ? 'bg-primary text-white shadow-md' : 'text-muted-foreground'}`}>
               <UserPlus className="w-4 h-4" /> Add
@@ -372,11 +412,19 @@ export function Community({ profile, addRoutine }) {
                         <Dumbbell className="w-5 h-5" />
                       </button>
                       <button 
-                        onClick={() => setActiveChat(friend)}
-                        className="bg-secondary p-2 rounded-lg text-primary hover:bg-secondary/80 transition-colors"
+                        onClick={() => {
+                          setActiveChat(friend);
+                          setNewMessages(prev => ({ ...prev, [friend.id]: 0 }));
+                        }}
+                        className="bg-secondary p-2 rounded-lg text-primary hover:bg-secondary/80 transition-colors relative"
                         title="Send Message"
                       >
                         <MessageCircle className="w-5 h-5" />
+                        {newMessages[friend.id] > 0 && (
+                          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[8px] w-4 h-4 rounded-full flex items-center justify-center font-bold">
+                            {newMessages[friend.id]}
+                          </span>
+                        )}
                       </button>
                     </div>
                   </div>

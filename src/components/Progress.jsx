@@ -3,8 +3,9 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer 
 } from 'recharts';
 import { 
-  Plus, Camera, Trash2, Ruler, TrendingUp, Sparkles, Loader2, Calendar, ChevronDown, ChevronUp, Settings2 
+  Plus, Camera, Trash2, Ruler, TrendingUp, Sparkles, Loader2, Calendar as CalendarIcon, ChevronDown, ChevronUp, Settings2 
 } from 'lucide-react';
+import { WorkoutCalendar } from './WorkoutCalendar';
 
 export function Progress({ profile, updateProfile, history, measurements, addMeasurement, deleteMeasurement, photos, uploadPhoto, deletePhoto }) {
   const [isAddingMeasurement, setIsAddingMeasurement] = useState(false);
@@ -118,6 +119,15 @@ export function Progress({ profile, updateProfile, history, measurements, addMea
           <p className="text-foreground font-medium relative z-10">{motivation}</p>
         </div>
       </header>
+
+      {/* Workout Calendar Section */}
+      <section className="space-y-4">
+        <h2 className="text-xl font-bold flex items-center gap-2">
+          <CalendarIcon className="w-5 h-5 text-muted-foreground" />
+          Workout Calendar
+        </h2>
+        <WorkoutCalendar history={history} profile={profile} />
+      </section>
 
       {/* Measurements Section */}
       <section className="space-y-4">

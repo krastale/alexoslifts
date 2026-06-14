@@ -1,19 +1,66 @@
-import { useState } from 'react';
-import { User, Weight, Activity } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { User, Weight, Activity, Check, X, Loader2 } from 'lucide-react';
+import { supabase } from '../supabaseClient';
 
 export function Onboarding({ onComplete }) {
   const [formData, setFormData] = useState({
-    name: '',
+    username: '',
     weight: '',
     units: 'kg'
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [usernameStatus, setUsernameStatus] = useState(null); // 'available', 'taken', 'checking', 'invalid'
+  const [usernameError, setUsernameError] = useState('');
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (formData.username.length >= 3) {
+        checkUsername(formData.username);
+      } else {
+        setUsernameStatus(null);
+        setUsernameError('');
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [formData.username]);
+
+  const checkUsername = async (username) => {
+    if (!/^[a-zA-Z0-9_]{3,15}$/.test(username)) {
+      setUsernameStatus('invalid');
+      setUsernameError('3-15 chars, alphanumeric & underscores only');
+      return;
+    }
+
+    setUsernameStatus('checking');
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('username')
+      .eq('username', username.toLowerCase())
+      .maybeSingle();
+
+    if (error) {
+      console.error('Error checking username:', error);
+      return;
+    }
+
+    if (data) {
+      setUsernameStatus('taken');
+      setUsernameError('Username already taken');
+    } else {
+      setUsernameStatus('available');
+      setUsernameError('');
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (formData.name && formData.weight) {
+    if (formData.username && formData.weight && usernameStatus === 'available') {
       setIsSubmitting(true);
-      await onComplete(formData);
+      await onComplete({
+        ...formData,
+        username: formData.username.toLowerCase()
+      });
       setIsSubmitting(false);
     }
   };
@@ -32,18 +79,29 @@ export function Onboarding({ onComplete }) {
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            <label className="block text-sm font-medium mb-2">Your Name</label>
+            <label className="block text-sm font-medium mb-2">Username</label>
             <div className="relative">
               <User className="absolute left-3 top-3 w-5 h-5 text-muted-foreground" />
               <input
                 type="text"
                 required
-                className="w-full bg-secondary border border-border rounded-lg py-2.5 pl-10 pr-4 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
-                placeholder="Alex"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                className={`w-full bg-secondary border border-border rounded-lg py-2.5 pl-10 pr-10 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all ${
+                  usernameStatus === 'taken' || usernameStatus === 'invalid' ? 'border-red-500/50' : 
+                  usernameStatus === 'available' ? 'border-green-500/50' : ''
+                }`}
+                placeholder="lift_king"
+                value={formData.username}
+                onChange={(e) => setFormData({ ...formData, username: e.target.value })}
               />
+              <div className="absolute right-3 top-3">
+                {usernameStatus === 'checking' && <Loader2 className="w-5 h-5 animate-spin text-primary" />}
+                {usernameStatus === 'available' && <Check className="w-5 h-5 text-green-500" />}
+                {(usernameStatus === 'taken' || usernameStatus === 'invalid') && <X className="w-5 h-5 text-red-500" />}
+              </div>
             </div>
+            {usernameError && (
+              <p className="text-[10px] font-bold text-red-500 mt-1 uppercase tracking-wider">{usernameError}</p>
+            )}
           </div>
 
           <div>

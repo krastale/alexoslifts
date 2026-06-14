@@ -61,6 +61,10 @@ export function Auth() {
     } catch (err) {
       if (err.message === 'Load failed' || err.name === 'TypeError') {
         setError('Network Error: Could not connect to Supabase. Check your connection.');
+      } else if (err.message.includes('rate limit')) {
+        setError('Too many attempts. Please wait a few minutes before trying again.');
+      } else if (err.message.includes('Email not confirmed')) {
+        setError('Please confirm your email address before logging in.');
       } else {
         setError(err.message || 'An unexpected error occurred.');
       }

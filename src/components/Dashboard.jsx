@@ -142,7 +142,7 @@ export function Dashboard({ profile, history, deleteHistory }) {
     <div className="p-6 space-y-8 pb-32 lg:pb-12">
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="space-y-1">
-          <h1 className="text-3xl font-bold tracking-tight">Welcome back, {profile?.name}</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Welcome back, {profile?.username || 'Lifter'}</h1>
           <p className="text-muted-foreground font-medium">Keep crushing those goals.</p>
         </div>
         

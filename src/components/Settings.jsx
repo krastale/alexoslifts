@@ -30,7 +30,7 @@ export function Settings({ profile, updateProfile }) {
         <div className="bg-card border border-border p-5 rounded-2xl space-y-4">
           <div className="flex justify-between items-center">
             <div>
-              <p className="font-medium">{profile?.username || profile?.name || 'User'}</p>
+              <p className="font-medium">@{profile?.username || 'User'}</p>
               <p className="text-sm text-muted-foreground">{profile?.weight} {profile?.units}</p>
             </div>
             <button 
@@ -39,7 +39,7 @@ export function Settings({ profile, updateProfile }) {
                 const username = prompt('Enter your username:', profile?.username);
                 const weight = prompt('Enter your weight:', profile?.weight);
                 if (username && weight) {
-                  updateProfile({ username, weight });
+                  updateProfile({ username: username.toLowerCase(), weight });
                 }
               }}
             >

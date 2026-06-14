@@ -5,7 +5,35 @@ export const EXERCISE_CATEGORIES = [
   'arms', 'shoulders', 'abs', 'chest', 'back', 'legs', 'gluteus', 'forearms'
 ];
 
-// ... (LIBRARY_ROUTINES unchanged)
+export const LIBRARY_ROUTINES = [
+  {
+    id: 'l1',
+    name: 'Push Day (PPL)',
+    exercises: [
+      { name: 'Bench Press', sets: 3, reps: 8, category: 'chest' },
+      { name: 'Overhead Press', sets: 3, reps: 10, category: 'shoulders' },
+      { name: 'Tricep Pushdowns', sets: 3, reps: 12, category: 'arms' }
+    ]
+  },
+  {
+    id: 'l2',
+    name: 'Pull Day (PPL)',
+    exercises: [
+      { name: 'Deadlift', sets: 3, reps: 5, category: 'back' },
+      { name: 'Pull Ups', sets: 3, reps: 10, category: 'back' },
+      { name: 'Bicep Curls', sets: 3, reps: 12, category: 'arms' }
+    ]
+  },
+  {
+    id: 'l3',
+    name: 'Leg Day (PPL)',
+    exercises: [
+      { name: 'Squats', sets: 3, reps: 8, category: 'legs' },
+      { name: 'Leg Press', sets: 3, reps: 12, category: 'legs' },
+      { name: 'Calf Raises', sets: 4, reps: 15, category: 'legs' }
+    ]
+  }
+];
 
 export function RoutineBuilder({ routines, addRoutine, deleteRoutine }) {
   const [activeTab, setActiveTab] = useState('mine'); // 'mine' or 'library'
@@ -16,37 +44,28 @@ export function RoutineBuilder({ routines, addRoutine, deleteRoutine }) {
     exercises: [{ name: '', sets: 3, reps: 10, category: 'arms' }]
   });
 
-  // ... (useEffect for importRoutine unchanged)
-
-  const handleAddExercise = () => {
-    setNewRoutine({
-      ...newRoutine,
-      exercises: [...newRoutine.exercises, { name: '', sets: 3, reps: 10, category: 'arms' }]
+  const importLibraryRoutine = (routine) => {
+    addRoutine({
+      name: routine.name,
+      exercises: routine.exercises,
+      is_public: false
     });
+    setActiveTab('mine');
   };
 
-  const handleRemoveExercise = (index) => {
-    const updated = [...newRoutine.exercises];
-    updated.splice(index, 1);
-    setNewRoutine({ ...newRoutine, exercises: updated });
-  };
-
-  const handleExerciseChange = (index, field, value) => {
-    const updated = [...newRoutine.exercises];
-    updated[index][field] = value;
-    setNewRoutine({ ...newRoutine, exercises: updated });
-  };
-
-  const handleSave = () => {
-    if (newRoutine.name && newRoutine.exercises.every(ex => ex.name)) {
-      addRoutine(newRoutine);
-      setNewRoutine({ name: '', is_public: true, exercises: [{ name: '', sets: 3, reps: 10, category: 'arms' }] });
-      setIsAdding(false);
-      setActiveTab('mine');
+  const handleShare = (routine) => {
+    const shareData = {
+      title: 'AlexosLifts Routine',
+      text: `Check out my workout routine: ${routine.name}`,
+      url: window.location.href
+    };
+    if (navigator.share) {
+      navigator.share(shareData);
+    } else {
+      navigator.clipboard.writeText(`Check out my workout routine: ${routine.name} at ${window.location.href}`);
+      alert('Link copied to clipboard!');
     }
   };
-
-  // ... (handleShare and importLibraryRoutine unchanged)
 
   return (
     <div className="p-6 space-y-6 pb-24 lg:pb-6">
