@@ -476,7 +476,7 @@ export function Community({ profile, addRoutine }) {
             <form onSubmit={handlePost} className="bg-card border border-border p-4 rounded-3xl shadow-sm space-y-3">
               <div className="flex gap-3">
                 <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center text-primary font-bold shrink-0">
-                  {profile?.username?.charAt(0).toUpperCase()}
+                  {profile?.username?.charAt(0)?.toUpperCase() || 'U'}
                 </div>
                 <textarea
                   value={postInput}
@@ -519,7 +519,7 @@ export function Community({ profile, addRoutine }) {
                     <div className="flex justify-between items-start">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-primary/20 rounded-full flex items-center justify-center text-primary font-bold">
-                          {item.profile?.username?.charAt(0).toUpperCase()}
+                          {item.profile?.username?.charAt(0)?.toUpperCase() || 'U'}
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
@@ -655,7 +655,7 @@ export function Community({ profile, addRoutine }) {
                   <div className="flex justify-between items-center">
                     <h3 className="font-bold text-lg flex items-center gap-2">
                       <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center text-primary text-xs">
-                        {friend.username?.charAt(0)?.toUpperCase()}
+                        {friend.username?.charAt(0)?.toUpperCase() || 'U'}
                       </div>
                       {friend.username}
                     </h3>
