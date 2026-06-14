@@ -31,21 +31,24 @@ export function Community({ profile, addRoutine }) {
     startOfWeek.setHours(0,0,0,0);
 
     const userStats = {};
-    const allProfiles = [profile, ...friends];
+    // Filter out any null profiles to prevent crashes
+    const allProfiles = [profile, ...friends].filter(Boolean);
 
     allProfiles.forEach(p => {
-      userStats[p.id] = { 
-        profile: p, 
-        volume: 0, 
-        workouts: 0, 
-        claps: 0 
-      };
+      if (p.id) {
+        userStats[p.id] = { 
+          profile: p, 
+          volume: 0, 
+          workouts: 0, 
+          claps: 0 
+        };
+      }
     });
 
     // Volume & Workouts
     feed.forEach(item => {
       if (item.type === 'workout' && new Date(item.timestamp) >= startOfWeek) {
-        if (userStats[item.user_id]) {
+        if (item.user_id && userStats[item.user_id]) {
           userStats[item.user_id].workouts += 1;
           const vol = item.exercises?.reduce((acc, ex) => 
             acc + (ex.sets?.reduce((sAcc, set) => sAcc + (parseFloat(set.weight) * parseInt(set.reps) || 0), 0) || 0)
@@ -58,7 +61,7 @@ export function Community({ profile, addRoutine }) {
     // Claps
     feedInteractions.forEach(m => {
       if (new Date(m.created_at) >= startOfWeek) {
-        if (userStats[m.receiver_id]) {
+        if (m.receiver_id && userStats[m.receiver_id]) {
           userStats[m.receiver_id].claps += 1;
         }
       }
@@ -120,7 +123,7 @@ export function Community({ profile, addRoutine }) {
           schema: 'public', 
           table: 'history'
         }, payload => {
-          const friend = friends.find(f => f.id === payload.new.user_id);
+          const friend = (friends || []).filter(Boolean).find(f => f.id === payload.new.user_id);
           if (friend) {
             setFeed(prev => [{ ...payload.new, profile: friend }, ...prev]);
           }
@@ -171,14 +174,14 @@ export function Community({ profile, addRoutine }) {
     
     if (historyRes.data) {
       historyRes.data.forEach(item => {
-        const userProfile = item.user_id === profile.id ? profile : friends.find(f => f.id === item.user_id);
+        const userProfile = item.user_id === profile.id ? profile : (friends || []).filter(Boolean).find(f => f.id === item.user_id);
         combinedFeed.push({ ...item, type: 'workout', profile: userProfile, timestamp: new Date(item.date).getTime() });
       });
     }
 
     if (postsRes.data) {
       postsRes.data.forEach(item => {
-        const userProfile = item.user_id === profile.id ? profile : friends.find(f => f.id === item.user_id);
+        const userProfile = item.user_id === profile.id ? profile : (friends || []).filter(Boolean).find(f => f.id === item.user_id);
         combinedFeed.push({ ...item, type: 'post', profile: userProfile, timestamp: new Date(item.created_at).getTime() });
       });
     }
@@ -592,10 +595,10 @@ export function Community({ profile, addRoutine }) {
               </h3>
               <div className="bg-card border border-border rounded-3xl divide-y divide-border overflow-hidden">
                 {leaderboardData.volume.map((stat, i) => (
-                  <div key={stat.profile.id} className="p-4 flex justify-between items-center">
+                  <div key={stat.profile?.id || i} className="p-4 flex justify-between items-center">
                     <div className="flex items-center gap-3">
                       <span className={`w-6 h-6 flex items-center justify-center rounded-full text-xs font-black ${i === 0 ? 'bg-yellow-500 text-black' : 'bg-secondary text-muted-foreground'}`}>{i + 1}</span>
-                      <span className="font-bold">{stat.profile.username}</span>
+                      <span className="font-bold">{stat.profile?.username || 'Lifter'}</span>
                     </div>
                     <span className="font-black text-primary">{stat.volume.toLocaleString()}</span>
                   </div>
@@ -610,10 +613,10 @@ export function Community({ profile, addRoutine }) {
               </h3>
               <div className="bg-card border border-border rounded-3xl divide-y divide-border overflow-hidden">
                 {leaderboardData.consistency.map((stat, i) => (
-                  <div key={stat.profile.id} className="p-4 flex justify-between items-center">
+                  <div key={stat.profile?.id || i} className="p-4 flex justify-between items-center">
                     <div className="flex items-center gap-3">
-                      <span className={`w-6 h-6 flex items-center justify-center rounded-full text-xs font-black ${i === 0 ? 'bg-blue-500 text-white' : 'bg-secondary text-muted-foreground'}`}>{i + 1}</span>
-                      <span className="font-bold">{stat.profile.username}</span>
+                      <span className={`w-6 h-6 flex items-center justify-center rounded-full text-xs font-black ${i === 0 ? (activeTab === 'leaderboards' ? (stat.claps !== undefined ? 'bg-red-500 text-white' : 'bg-blue-500 text-white') : 'bg-secondary') : 'bg-secondary text-muted-foreground'}`}>{i + 1}</span>
+                      <span className="font-bold">{stat.profile?.username || 'Lifter'}</span>
                     </div>
                     <span className="font-black text-blue-500">{stat.workouts} Workouts</span>
                   </div>
@@ -628,10 +631,10 @@ export function Community({ profile, addRoutine }) {
               </h3>
               <div className="bg-card border border-border rounded-3xl divide-y divide-border overflow-hidden">
                 {leaderboardData.popular.map((stat, i) => (
-                  <div key={stat.profile.id} className="p-4 flex justify-between items-center">
+                  <div key={stat.profile?.id || i} className="p-4 flex justify-between items-center">
                     <div className="flex items-center gap-3">
                       <span className={`w-6 h-6 flex items-center justify-center rounded-full text-xs font-black ${i === 0 ? 'bg-red-500 text-white' : 'bg-secondary text-muted-foreground'}`}>{i + 1}</span>
-                      <span className="font-bold">{stat.profile.username}</span>
+                      <span className="font-bold">{stat.profile?.username || 'Lifter'}</span>
                     </div>
                     <span className="font-black text-red-500">{stat.claps} Claps</span>
                   </div>
