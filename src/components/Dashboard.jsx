@@ -63,20 +63,24 @@ export function Dashboard({ profile, history, deleteHistory }) {
       percentage: Math.round((value / totalVolume) * 100)
     })).sort((a, b) => b.value - a.value);
 
-    // Streak always uses full history for accuracy
+    // Streak logic with 1-day grace period
     let streak = 0;
     const sortedDates = [...new Set(history.map(w => w.date.split('T')[0]))].sort().reverse();
     const today = new Date().toISOString().split('T')[0];
+    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
     
-    let current = today;
-    for (const date of sortedDates) {
-      if (date === current) {
-        streak++;
-        const prev = new Date(current);
-        prev.setDate(prev.getDate() - 1);
-        current = prev.toISOString().split('T')[0];
-      } else if (date < current) {
-        break;
+    let current = sortedDates[0] === today ? today : yesterday;
+    
+    if (sortedDates.includes(today) || sortedDates.includes(yesterday)) {
+      for (const date of sortedDates) {
+        if (date === current) {
+          streak++;
+          const prev = new Date(current);
+          prev.setDate(prev.getDate() - 1);
+          current = prev.toISOString().split('T')[0];
+        } else if (date < current) {
+          break;
+        }
       }
     }
 

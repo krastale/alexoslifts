@@ -39,6 +39,7 @@ export function RoutineBuilder({ routines, addRoutine, deleteRoutine, updateRout
   const [activeTab, setActiveTab] = useState('mine'); // 'mine' or 'library'
   const [isAdding, setIsAdding] = useState(false);
   const [editingRoutine, setEditingRoutine] = useState(null);
+
   const [newRoutine, setNewRoutine] = useState({
     name: '',
     is_public: true,

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
-import { Users, UserPlus, MessageCircle, Send, Trophy, Loader2, Check, X, Activity, Heart, Dumbbell, RefreshCw, Globe, Download } from 'lucide-react';
+import { Users, UserPlus, MessageCircle, Send, Trophy, Loader2, Check, X, Activity, Heart, Dumbbell, RefreshCw, Globe, Download, Flame, BarChart3 } from 'lucide-react';
 
 export function Community({ profile, addRoutine }) {
   const [activeTab, setActiveTab] = useState('feed'); // feed, friends, add, chat
@@ -22,6 +22,54 @@ export function Community({ profile, addRoutine }) {
   const messagesEndRef = useRef(null);
 
   const [newMessages, setNewMessages] = useState({}); // { friendId: count }
+
+  const leaderboardData = useMemo(() => {
+    if (activeTab !== 'leaderboards') return null;
+
+    const startOfWeek = new Date();
+    startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
+    startOfWeek.setHours(0,0,0,0);
+
+    const userStats = {};
+    const allProfiles = [profile, ...friends];
+
+    allProfiles.forEach(p => {
+      userStats[p.id] = { 
+        profile: p, 
+        volume: 0, 
+        workouts: 0, 
+        claps: 0 
+      };
+    });
+
+    // Volume & Workouts
+    feed.forEach(item => {
+      if (item.type === 'workout' && new Date(item.timestamp) >= startOfWeek) {
+        if (userStats[item.user_id]) {
+          userStats[item.user_id].workouts += 1;
+          const vol = item.exercises?.reduce((acc, ex) => 
+            acc + (ex.sets?.reduce((sAcc, set) => sAcc + (parseFloat(set.weight) * parseInt(set.reps) || 0), 0) || 0)
+          , 0) || 0;
+          userStats[item.user_id].volume += vol;
+        }
+      }
+    });
+
+    // Claps
+    feedInteractions.forEach(m => {
+      if (new Date(m.created_at) >= startOfWeek) {
+        if (userStats[m.receiver_id]) {
+          userStats[m.receiver_id].claps += 1;
+        }
+      }
+    });
+
+    return {
+      volume: Object.values(userStats).sort((a, b) => b.volume - a.volume),
+      consistency: Object.values(userStats).sort((a, b) => b.workouts - a.workouts),
+      popular: Object.values(userStats).sort((a, b) => b.claps - a.claps)
+    };
+  }, [activeTab, feed, feedInteractions, friends, profile]);
 
   // Friend Profile View
   const [viewingFriendRoutines, setViewingFriendRoutines] = useState(null);
@@ -401,6 +449,12 @@ export function Community({ profile, addRoutine }) {
               <UserPlus className="w-4 h-4" /> Add
               {pendingRequests.length > 0 && <span className="bg-red-500 text-white w-4 h-4 rounded-full text-[10px] flex items-center justify-center">{pendingRequests.length}</span>}
             </button>
+            <button 
+              onClick={() => setActiveTab('leaderboards')} 
+              className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-bold transition-all ${activeTab === 'leaderboards' ? 'bg-primary text-white shadow-md' : 'text-muted-foreground'}`}
+            >
+              <BarChart3 className="w-4 h-4" /> Leaders
+            </button>
           </div>
         ) : (
           <div className="flex items-center gap-3">
@@ -468,7 +522,14 @@ export function Community({ profile, addRoutine }) {
                           {item.profile?.username?.charAt(0).toUpperCase()}
                         </div>
                         <div>
-                          <h3 className="font-bold">{item.profile?.username || 'Lifter'}</h3>
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-bold">{item.profile?.username || 'Lifter'}</h3>
+                            {isWorkout && item.exercises?.some(ex => ex.sets?.some(s => s.isPR)) && (
+                              <span className="bg-orange-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded flex items-center gap-0.5 animate-pulse">
+                                NEW PR <Flame className="w-2 h-2 fill-white" />
+                              </span>
+                            )}
+                          </div>
                           <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
                             {new Date(item.timestamp).toLocaleDateString()} at {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </p>
@@ -510,6 +571,73 @@ export function Community({ profile, addRoutine }) {
                 );
               })
             )}
+          </div>
+        )}
+
+        {/* Leaderboards View */}
+        {!activeChat && !viewingFriendRoutines && activeTab === 'leaderboards' && leaderboardData && (
+          <div className="p-4 space-y-8 pb-32">
+            <div className="bg-gradient-to-br from-primary/20 to-primary/5 p-6 rounded-3xl border border-primary/20">
+              <h2 className="text-xl font-black italic uppercase tracking-tighter flex items-center gap-2 mb-1">
+                <Trophy className="w-6 h-6 text-yellow-500 fill-yellow-500" />
+                Weekly Champions
+              </h2>
+              <p className="text-xs text-muted-foreground font-bold uppercase tracking-widest">Resets every Sunday</p>
+            </div>
+
+            {/* Volume King */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                <Dumbbell className="w-4 h-4" /> Volume King (kg)
+              </h3>
+              <div className="bg-card border border-border rounded-3xl divide-y divide-border overflow-hidden">
+                {leaderboardData.volume.map((stat, i) => (
+                  <div key={stat.profile.id} className="p-4 flex justify-between items-center">
+                    <div className="flex items-center gap-3">
+                      <span className={`w-6 h-6 flex items-center justify-center rounded-full text-xs font-black ${i === 0 ? 'bg-yellow-500 text-black' : 'bg-secondary text-muted-foreground'}`}>{i + 1}</span>
+                      <span className="font-bold">{stat.profile.username}</span>
+                    </div>
+                    <span className="font-black text-primary">{stat.volume.toLocaleString()}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Consistency Legend */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                <Calendar className="w-4 h-4" /> Consistency Legend
+              </h3>
+              <div className="bg-card border border-border rounded-3xl divide-y divide-border overflow-hidden">
+                {leaderboardData.consistency.map((stat, i) => (
+                  <div key={stat.profile.id} className="p-4 flex justify-between items-center">
+                    <div className="flex items-center gap-3">
+                      <span className={`w-6 h-6 flex items-center justify-center rounded-full text-xs font-black ${i === 0 ? 'bg-blue-500 text-white' : 'bg-secondary text-muted-foreground'}`}>{i + 1}</span>
+                      <span className="font-bold">{stat.profile.username}</span>
+                    </div>
+                    <span className="font-black text-blue-500">{stat.workouts} Workouts</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Clap Magnet */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                <Heart className="w-4 h-4" /> Clap Magnet
+              </h3>
+              <div className="bg-card border border-border rounded-3xl divide-y divide-border overflow-hidden">
+                {leaderboardData.popular.map((stat, i) => (
+                  <div key={stat.profile.id} className="p-4 flex justify-between items-center">
+                    <div className="flex items-center gap-3">
+                      <span className={`w-6 h-6 flex items-center justify-center rounded-full text-xs font-black ${i === 0 ? 'bg-red-500 text-white' : 'bg-secondary text-muted-foreground'}`}>{i + 1}</span>
+                      <span className="font-bold">{stat.profile.username}</span>
+                    </div>
+                    <span className="font-black text-red-500">{stat.claps} Claps</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         )}
 

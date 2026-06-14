@@ -18,8 +18,19 @@ export function Progress({ profile, updateProfile, history, measurements, addMea
 
   const [newMeasurementData, setNewMeasurementData] = useState({});
   const [selectedChartMetric, setSelectedChartMetric] = useState('Weight');
+  const [comparisonPhotos, setComparisonPhotos] = useState([]); // [photo1, photo2]
+  const [sliderPosition, setSliderPosition] = useState(50);
   
   const fileInputRef = useRef(null);
+
+  const handleSelectForComparison = (photo) => {
+    setComparisonPhotos(prev => {
+      const exists = prev.find(p => p.id === photo.id);
+      if (exists) return prev.filter(p => p.id !== photo.id);
+      if (prev.length >= 2) return [prev[1], photo];
+      return [...prev, photo];
+    });
+  };
 
   // Motivational Logic
   const motivation = useMemo(() => {
@@ -277,6 +288,90 @@ export function Progress({ profile, updateProfile, history, measurements, addMea
         )}
       </section>
 
+      {/* Transformation Slider */}
+      {photos.length >= 2 && (
+        <section className="space-y-4">
+          <h2 className="text-xl font-bold flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-primary" />
+            Transformation Slider
+          </h2>
+          
+          <div className="bg-card border border-border p-6 rounded-3xl space-y-6">
+            {comparisonPhotos.length === 2 ? (
+              <div className="space-y-6">
+                <div className="relative aspect-[4/5] md:aspect-video w-full rounded-2xl overflow-hidden cursor-ew-resize select-none border border-border shadow-2xl">
+                  {/* After Image (Base) */}
+                  <img 
+                    src={comparisonPhotos[1].url} 
+                    alt="After" 
+                    className="absolute inset-0 w-full h-full object-cover"
+                  />
+                  {/* Before Image (Overlay with clip-path) */}
+                  <div 
+                    className="absolute inset-0 w-full h-full overflow-hidden"
+                    style={{ clipPath: `inset(0 ${100 - sliderPosition}% 0 0)` }}
+                  >
+                    <img 
+                      src={comparisonPhotos[0].url} 
+                      alt="Before" 
+                      className="absolute inset-0 w-full h-full object-cover"
+                    />
+                  </div>
+                  {/* Slider Handle */}
+                  <div 
+                    className="absolute top-0 bottom-0 w-1 bg-white shadow-[0_0_10px_rgba(0,0,0,0.5)] z-10"
+                    style={{ left: `${sliderPosition}%` }}
+                  >
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 bg-white rounded-full shadow-xl flex items-center justify-center">
+                      <Ruler className="w-4 h-4 text-primary rotate-90" />
+                    </div>
+                  </div>
+                  {/* Range Input (Invisible overlay) */}
+                  <input 
+                    type="range" 
+                    min="0" max="100" 
+                    value={sliderPosition} 
+                    onChange={(e) => setSliderPosition(parseInt(e.target.value))}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-ew-resize z-20"
+                  />
+
+                  {/* Labels */}
+                  <div className="absolute bottom-4 left-4 z-10 bg-black/60 backdrop-blur px-3 py-1 rounded-lg text-[10px] font-black uppercase text-white">Before</div>
+                  <div className="absolute bottom-4 right-4 z-10 bg-black/60 backdrop-blur px-3 py-1 rounded-lg text-[10px] font-black uppercase text-white">After</div>
+                </div>
+                <button 
+                  onClick={() => setComparisonPhotos([])}
+                  className="w-full py-3 bg-secondary hover:bg-secondary/80 rounded-xl text-sm font-bold transition-all"
+                >
+                  Change Photos
+                </button>
+              </div>
+            ) : (
+              <div className="text-center py-8 space-y-4">
+                <div className="p-4 bg-primary/10 rounded-full w-fit mx-auto">
+                  <Sparkles className="w-8 h-8 text-primary" />
+                </div>
+                <div>
+                  <p className="font-bold">Create a Before & After</p>
+                  <p className="text-xs text-muted-foreground">Select two photos from your gallery below to compare them.</p>
+                </div>
+                <div className="flex justify-center gap-2">
+                  {[0, 1].map(i => (
+                    <div key={i} className={`w-12 h-12 rounded-lg border-2 border-dashed flex items-center justify-center ${comparisonPhotos[i] ? 'border-primary bg-primary/10' : 'border-border'}`}>
+                      {comparisonPhotos[i] ? (
+                        <img src={comparisonPhotos[i].url} className="w-full h-full object-cover rounded-md" />
+                      ) : (
+                        <Plus className="w-4 h-4 text-muted-foreground" />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
       {/* Photo Gallery Section */}
       <section className="space-y-4">
         <div className="flex justify-between items-center">
@@ -303,27 +398,39 @@ export function Progress({ profile, updateProfile, history, measurements, addMea
 
         {photos.length > 0 ? (
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            {photos.map((photo, idx) => (
-              <div key={photo.id || `photo-${idx}`} className="aspect-square bg-card border border-border rounded-xl overflow-hidden relative group">
-                <img 
-                  src={photo.url} 
-                  alt="Progress" 
-                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
-                />
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                  <button 
-                    onClick={() => deletePhoto(photo)}
-                    className="p-2 bg-red-500 text-white rounded-full hover:scale-110 transition-transform"
-                  >
-                    <Trash2 className="w-5 h-5" />
-                  </button>
+            {photos.map((photo, idx) => {
+              const isSelected = comparisonPhotos.some(p => p.id === photo.id);
+              return (
+                <div 
+                  key={photo.id || `photo-${idx}`} 
+                  onClick={() => handleSelectForComparison(photo)}
+                  className={`aspect-square bg-card border-2 rounded-2xl overflow-hidden relative group cursor-pointer transition-all ${isSelected ? 'border-primary ring-4 ring-primary/20' : 'border-border hover:border-primary/50'}`}
+                >
+                  <img 
+                    src={photo.url} 
+                    alt="Progress" 
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
+                  />
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); deletePhoto(photo); }}
+                      className="p-2 bg-red-500 text-white rounded-full hover:scale-110 transition-transform"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                    </button>
+                  </div>
+                  {isSelected && (
+                    <div className="absolute top-2 right-2 bg-primary text-white w-6 h-6 rounded-full flex items-center justify-center font-black text-xs shadow-lg">
+                      {comparisonPhotos.findIndex(p => p.id === photo.id) + 1}
+                    </div>
+                  )}
+                  <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur px-2 py-1 rounded text-[10px] text-white flex items-center gap-1">
+                    <CalendarIcon className="w-3 h-3" />
+                    {photo.date ? new Date(photo.date).toLocaleDateString() : 'New'}
+                  </div>
                 </div>
-                <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur px-2 py-1 rounded text-[10px] text-white flex items-center gap-1">
-                  <CalendarIcon className="w-3 h-3" />
-                  {photo.date ? new Date(photo.date).toLocaleDateString() : 'New'}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <div className="bg-secondary/20 border border-dashed border-border p-12 rounded-2xl text-center space-y-4">
