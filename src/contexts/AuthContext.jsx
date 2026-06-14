@@ -37,11 +37,11 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const getRedirectUrl = () => {
-    // Returns the current origin (e.g., http://localhost:5173 or https://alexkrastenov.github.io)
+    // Returns the current origin (e.g., http://localhost:5173 or https://krastale.github.io)
     // We add the path for GitHub Pages if we're not on localhost
     return window.location.origin.includes('localhost') 
       ? window.location.origin 
-      : 'https://alexkrastenov.github.io/alexoslifts/';
+      : 'https://krastale.github.io/alexoslifts/';
   };
 
   const signUp = (email, password) => supabase.auth.signUp({ 
