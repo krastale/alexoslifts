@@ -279,22 +279,38 @@ export function Community({ profile, addRoutine }) {
   };
 
   const sendFriendRequest = async (userId) => {
-    await supabase.from('friendships').insert([{
+    const { error } = await supabase.from('friendships').insert([{
       user_id_1: profile.id,
       user_id_2: userId,
       status: 'pending'
     }]);
-    alert('Friend request sent!');
+
+    if (error) {
+      console.error('Error sending friend request:', error);
+      alert(`Failed to send request: ${error.message}`);
+    } else {
+      alert('Friend request sent!');
+      fetchFriendsAndRequests();
+    }
     setSearchResults([]);
   };
 
   const handleRequest = async (friendshipId, accept) => {
+    let error;
     if (accept) {
-      await supabase.from('friendships').update({ status: 'accepted' }).eq('id', friendshipId);
+      const { error: err } = await supabase.from('friendships').update({ status: 'accepted' }).eq('id', friendshipId);
+      error = err;
     } else {
-      await supabase.from('friendships').delete().eq('id', friendshipId);
+      const { error: err } = await supabase.from('friendships').delete().eq('id', friendshipId);
+      error = err;
     }
-    fetchFriendsAndRequests();
+
+    if (error) {
+      console.error('Error handling friend request:', error);
+      alert(`Error: ${error.message}`);
+    } else {
+      fetchFriendsAndRequests();
+    }
   };
 
   const sendMessage = async (e) => {
