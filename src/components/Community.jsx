@@ -8,6 +8,7 @@ export function Community({ profile, addRoutine }) {
   const [feed, setFeed] = useState([]);
   const [feedInteractions, setFeedInteractions] = useState([]);
   const [pendingRequests, setPendingRequests] = useState([]);
+  const [sentRequests, setSentRequests] = useState([]);
   const [friendScores, setFriendScores] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
@@ -180,7 +181,7 @@ export function Community({ profile, addRoutine }) {
     if (!profile?.id) return;
     setLoading(true);
     try {
-      // Simplified select to avoid potential FK name issues
+      // Fetch where I am user_1 (sender) or user_2 (receiver)
       const { data, error } = await supabase
         .from('friendships')
         .select(`
@@ -194,20 +195,27 @@ export function Community({ profile, addRoutine }) {
 
       if (data) {
         const accepted = [];
-        const pending = [];
+        const incoming = [];
+        const outgoing = [];
+        
         data.forEach(f => {
           const isUser1 = f.user_id_1 === profile.id;
           const friendProfile = isUser1 ? f.user2 : f.user1;
-          if (!friendProfile) return;
-
+          
           if (f.status === 'accepted') {
-            accepted.push({ ...friendProfile, friendship_id: f.id });
-          } else if (f.status === 'pending' && !isUser1) {
-            pending.push({ ...friendProfile, friendship_id: f.id });
+            if (friendProfile) accepted.push({ ...friendProfile, friendship_id: f.id });
+          } else if (f.status === 'pending') {
+            if (isUser1) {
+              if (friendProfile) outgoing.push({ ...friendProfile, friendship_id: f.id });
+            } else {
+              if (friendProfile) incoming.push({ ...friendProfile, friendship_id: f.id });
+            }
           }
         });
+        
         setFriends(accepted);
-        setPendingRequests(pending);
+        setPendingRequests(incoming);
+        setSentRequests(outgoing);
       }
     } catch (err) {
       console.error('Error fetching friends:', err);
@@ -538,7 +546,7 @@ export function Community({ profile, addRoutine }) {
           <div className="p-4 space-y-8">
             {pendingRequests.length > 0 && (
               <div className="space-y-3">
-                <h3 className="font-bold text-sm text-muted-foreground uppercase">Friend Requests</h3>
+                <h3 className="font-bold text-sm text-muted-foreground uppercase">Incoming Requests</h3>
                 {pendingRequests.map(req => (
                   <div key={req.friendship_id} className="bg-card border border-border p-3 rounded-xl flex justify-between items-center">
                     <span className="font-bold">{req.username}</span>
@@ -546,6 +554,18 @@ export function Community({ profile, addRoutine }) {
                       <button onClick={() => handleRequest(req.friendship_id, true)} className="p-2 bg-green-500 text-white rounded-lg"><Check className="w-4 h-4" /></button>
                       <button onClick={() => handleRequest(req.friendship_id, false)} className="p-2 bg-red-500 text-white rounded-lg"><X className="w-4 h-4" /></button>
                     </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {sentRequests.length > 0 && (
+              <div className="space-y-3">
+                <h3 className="font-bold text-sm text-muted-foreground uppercase">Sent Requests</h3>
+                {sentRequests.map(req => (
+                  <div key={req.friendship_id} className="bg-card border border-border p-3 rounded-xl flex justify-between items-center opacity-70">
+                    <span className="font-bold">{req.username}</span>
+                    <span className="text-xs font-bold uppercase tracking-widest text-primary">Pending</span>
                   </div>
                 ))}
               </div>
@@ -565,17 +585,36 @@ export function Community({ profile, addRoutine }) {
               </form>
 
               <div className="space-y-2 mt-4">
-                {searchResults.map(u => (
-                  <div key={u.id} className="bg-card border border-border p-3 rounded-xl flex justify-between items-center">
-                    <span className="font-bold">{u.username}</span>
-                    <button 
-                      onClick={() => sendFriendRequest(u.id)}
-                      className="text-xs bg-secondary px-3 py-1.5 rounded-lg font-bold hover:bg-secondary/80"
-                    >
-                      Add
-                    </button>
-                  </div>
-                ))}
+                {searchResults.map(u => {
+                  const isFriend = friends.some(f => f.id === u.id);
+                  const isSent = sentRequests.some(s => s.id === u.id);
+                  const isIncoming = pendingRequests.some(p => p.id === u.id);
+
+                  return (
+                    <div key={u.id} className="bg-card border border-border p-3 rounded-xl flex justify-between items-center">
+                      <span className="font-bold">{u.username}</span>
+                      {isFriend ? (
+                        <span className="text-xs text-green-500 font-bold px-3 py-1.5 bg-green-500/10 rounded-lg">Friends</span>
+                      ) : isSent ? (
+                        <span className="text-xs text-primary font-bold px-3 py-1.5 bg-primary/10 rounded-lg">Request Sent</span>
+                      ) : isIncoming ? (
+                        <button 
+                          onClick={() => setActiveTab('add')}
+                          className="text-xs bg-primary text-white px-3 py-1.5 rounded-lg font-bold"
+                        >
+                          Respond
+                        </button>
+                      ) : (
+                        <button 
+                          onClick={() => sendFriendRequest(u.id)}
+                          className="text-xs bg-secondary px-3 py-1.5 rounded-lg font-bold hover:bg-secondary/80"
+                        >
+                          Add
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>
