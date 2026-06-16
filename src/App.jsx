@@ -13,7 +13,7 @@ import { Progress } from './components/Progress';
 import { Community } from './components/Community';
 
 function AppContent() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, isRecoveryMode } = useAuth();
   const { 
     profile, updateProfile, routines, addRoutine, updateRoutine, deleteRoutine, 
     history, addHistory, deleteHistory, loading: dataLoading,
@@ -24,6 +24,12 @@ function AppContent() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [activeWorkout, setActiveWorkout] = useState(null);
   const [isWorkoutMinimized, setIsWorkoutMinimized] = useState(false);
+
+  useEffect(() => {
+    if (isRecoveryMode) {
+      setActiveTab('settings');
+    }
+  }, [isRecoveryMode]);
 
   useEffect(() => {
     const handleStartWorkout = (e) => {

@@ -1,15 +1,22 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { LogOut, User, Info, Loader2, Check, X, Weight } from 'lucide-react';
+import { LogOut, User, Info, Loader2, Check, X, Weight, Lock } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 
 export function Settings({ profile, updateProfile }) {
-  const { signOut } = useAuth();
+  const { signOut, updatePassword, isRecoveryMode, setIsRecoveryMode } = useAuth();
   const [isUpdating, setIsUpdating] = useState(false);
   const [newUsername, setNewUsername] = useState(profile?.username || '');
   const [newWeight, setNewWeight] = useState(profile?.weight || '');
   const [usernameStatus, setUsernameStatus] = useState(null); // 'available', 'taken', 'checking', 'invalid'
   const [usernameError, setUsernameError] = useState('');
+
+  // Password state
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordMessage, setPasswordMessage] = useState('');
 
   useEffect(() => {
     setNewUsername(profile?.username || '');
@@ -74,6 +81,34 @@ export function Settings({ profile, updateProfile }) {
     alert('Profile Updated!');
   };
 
+  const handlePasswordChange = async (e) => {
+    e.preventDefault();
+    setPasswordError('');
+    setPasswordMessage('');
+
+    if (password.length < 6) {
+      setPasswordError('Password must be at least 6 characters.');
+      return;
+    }
+    if (password !== confirmPassword) {
+      setPasswordError('Passwords do not match.');
+      return;
+    }
+
+    setIsUpdatingPassword(true);
+    const { error } = await updatePassword(password);
+    setIsUpdatingPassword(false);
+
+    if (error) {
+      setPasswordError(error.message);
+    } else {
+      setPasswordMessage('Password updated successfully!');
+      setPassword('');
+      setConfirmPassword('');
+      setIsRecoveryMode(false); // Clear recovery mode after successful update
+    }
+  };
+
   return (
     <div className="p-6 space-y-8 pb-32 lg:pb-12 max-w-2xl mx-auto">
       <header>
@@ -135,6 +170,65 @@ export function Settings({ profile, updateProfile }) {
             className="w-full bg-primary hover:bg-primary/90 text-white font-black py-4 rounded-2xl shadow-lg shadow-primary/20 transition-all flex items-center justify-center gap-2 uppercase tracking-widest disabled:opacity-50"
           >
             {isUpdating ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Save Changes'}
+          </button>
+        </form>
+      </section>
+
+      <section className="space-y-4">
+        <h2 className="text-sm font-black text-muted-foreground uppercase tracking-[0.2em] flex items-center gap-2">
+          <Lock className="w-4 h-4" />
+          Security
+        </h2>
+        
+        <form onSubmit={handlePasswordChange} className={`bg-card border p-6 rounded-3xl space-y-6 shadow-sm ${isRecoveryMode ? 'border-primary ring-2 ring-primary/20' : 'border-border'}`}>
+          {isRecoveryMode && (
+            <div className="p-4 bg-primary/10 text-primary text-sm font-bold rounded-2xl mb-4 text-center">
+              Please enter your new password to complete the reset process.
+            </div>
+          )}
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs font-black uppercase tracking-widest text-muted-foreground mb-2">New Password</label>
+              <div className="relative">
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <input
+                  type="password"
+                  className="w-full bg-secondary border-2 border-transparent focus:border-primary rounded-2xl py-3.5 pl-11 pr-4 outline-none transition-all font-bold"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-black uppercase tracking-widest text-muted-foreground mb-2">Confirm Password</label>
+              <div className="relative">
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <input
+                  type="password"
+                  className="w-full bg-secondary border-2 border-transparent focus:border-primary rounded-2xl py-3.5 pl-11 pr-4 outline-none transition-all font-bold"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="••••••••"
+                />
+              </div>
+            </div>
+          </div>
+
+          {passwordError && (
+            <p className="text-[10px] font-black text-red-500 uppercase tracking-widest text-center">{passwordError}</p>
+          )}
+          {passwordMessage && (
+            <p className="text-[10px] font-black text-green-500 uppercase tracking-widest text-center">{passwordMessage}</p>
+          )}
+
+          <button
+            type="submit"
+            disabled={isUpdatingPassword || !password || !confirmPassword}
+            className="w-full bg-primary hover:bg-primary/90 text-white font-black py-4 rounded-2xl shadow-lg shadow-primary/20 transition-all flex items-center justify-center gap-2 uppercase tracking-widest disabled:opacity-50"
+          >
+            {isUpdatingPassword ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Update Password'}
           </button>
         </form>
       </section>

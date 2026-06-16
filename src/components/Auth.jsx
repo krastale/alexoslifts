@@ -8,23 +8,11 @@ export function Auth() {
   const [password, setPassword] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
   const [isResetMode, setIsResetMode] = useState(false);
-  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [message, setMessage] = useState(null);
 
-  const { signIn, signUp, resetPassword, updatePassword } = useAuth();
-
-  useEffect(() => {
-    // Check if we arrived here from a password reset link
-    supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === "PASSWORD_RECOVERY") {
-        setIsUpdatingPassword(true);
-        setIsResetMode(false);
-        setIsSignUp(false);
-      }
-    });
-  }, []);
+  const { signIn, signUp, resetPassword } = useAuth();
 
   const handleAuth = async (e) => {
     e.preventDefault();
@@ -33,15 +21,6 @@ export function Auth() {
     setMessage(null);
     
     try {
-      if (isUpdatingPassword) {
-        const { error: updateError } = await updatePassword(password);
-        if (updateError) throw updateError;
-        setMessage('Password updated successfully! You can now log in.');
-        setIsUpdatingPassword(false);
-        setPassword('');
-        return;
-      }
-
       if (isResetMode) {
         const { error: resetError } = await resetPassword(email);
         if (resetError) throw resetError;
@@ -84,8 +63,7 @@ export function Auth() {
         
         <h1 className="text-3xl font-black italic uppercase tracking-tighter text-center mb-2">AlexosLifts</h1>
         <p className="text-muted-foreground text-center mb-8 font-bold text-sm">
-          {isUpdatingPassword ? 'Set your new password' : 
-           isResetMode ? 'Reset your password' :
+          {isResetMode ? 'Reset your password' :
            isSignUp ? 'Create your cloud account' : 'Sign in to sync your workouts'}
         </p>
 
@@ -104,27 +82,25 @@ export function Auth() {
             </div>
           )}
 
-          {!isUpdatingPassword && (
-            <div>
-              <label className="block text-sm font-medium mb-2">Email Address</label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-3 w-5 h-5 text-muted-foreground" />
-                <input
-                  type="email"
-                  required
-                  className="w-full bg-secondary border border-border rounded-lg py-2.5 pl-10 pr-4 focus:ring-2 focus:ring-primary outline-none transition-all"
-                  placeholder="you@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </div>
+          <div>
+            <label className="block text-sm font-medium mb-2">Email Address</label>
+            <div className="relative">
+              <Mail className="absolute left-3 top-3 w-5 h-5 text-muted-foreground" />
+              <input
+                type="email"
+                required
+                className="w-full bg-secondary border border-border rounded-lg py-2.5 pl-10 pr-4 focus:ring-2 focus:ring-primary outline-none transition-all"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
             </div>
-          )}
+          </div>
 
           {!isResetMode && (
             <div>
               <label className="block text-sm font-medium mb-2">
-                {isUpdatingPassword ? 'New Password' : 'Password'}
+                Password
               </label>
               <div className="relative">
                 <Lock className="absolute left-3 top-3 w-5 h-5 text-muted-foreground" />
@@ -147,27 +123,24 @@ export function Auth() {
             className="w-full bg-primary hover:bg-primary/90 text-white font-bold py-3 rounded-lg shadow-lg shadow-primary/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
           >
             {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 
-             (isUpdatingPassword ? 'Update Password' :
-              isResetMode ? 'Send Reset Link' :
+             (isResetMode ? 'Send Reset Link' :
               isSignUp ? 'Sign Up' : 'Log In')}
           </button>
         </form>
 
         <div className="mt-6 space-y-3 text-center">
-          {!isUpdatingPassword && (
-            <button
-              onClick={() => {
-                setIsResetMode(!isResetMode);
-                setError(null);
-                setMessage(null);
-              }}
-              className="block w-full text-sm text-muted-foreground hover:text-primary transition-colors"
-            >
-              {isResetMode ? 'Back to login' : 'Forgot your password?'}
-            </button>
-          )}
+          <button
+            onClick={() => {
+              setIsResetMode(!isResetMode);
+              setError(null);
+              setMessage(null);
+            }}
+            className="block w-full text-sm text-muted-foreground hover:text-primary transition-colors"
+          >
+            {isResetMode ? 'Back to login' : 'Forgot your password?'}
+          </button>
           
-          {!isResetMode && !isUpdatingPassword && (
+          {!isResetMode && (
             <button
               onClick={() => {
                 setIsSignUp(!isSignUp);
