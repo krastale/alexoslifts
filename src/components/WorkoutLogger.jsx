@@ -260,7 +260,11 @@ export function WorkoutLogger({ routine, history, onSave, onCancel, onMinimize }
         </div>
         <div className="flex gap-2">
           <button 
-            onClick={onCancel}
+            onClick={() => {
+              if (window.confirm("Are you sure you want to cancel this workout? All progress will be lost.")) {
+                onCancel();
+              }
+            }}
             className="p-2.5 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all"
             title="Cancel Workout"
           >
