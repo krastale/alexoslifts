@@ -233,7 +233,7 @@ export function WorkoutLogger({ routine, history, onSave, onCancel, onMinimize }
   const handleFinish = () => {
     onSave({
       ...workout,
-      duration: Math.floor(elapsed / 60),
+      duration: Math.min(Math.floor(elapsed / 60), 300),
       date: new Date().toISOString()
     });
   };

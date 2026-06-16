@@ -70,7 +70,7 @@ export function Onboarding({ onComplete }) {
       <div className="w-full max-w-md p-8 rounded-3xl bg-card border border-border shadow-2xl">
         <div className="flex justify-center mb-6">
           <div className="w-24 h-24 rounded-3xl overflow-hidden shadow-lg border border-border/50">
-            <img src="/assets/logo.png" alt="AlexosLifts Logo" className="w-full h-full object-cover" />
+            <img src={`${import.meta.env.BASE_URL}assets/logo.png`} alt="AlexosLifts Logo" className="w-full h-full object-cover" />
           </div>
         </div>
         

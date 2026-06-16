@@ -147,7 +147,7 @@ export function Dashboard({ profile, history, deleteHistory }) {
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <div className="w-14 h-14 rounded-2xl overflow-hidden shadow-md border border-border/50 shrink-0">
-            <img src="/assets/logo.png" alt="AlexosLifts Logo" className="w-full h-full object-cover" />
+            <img src={`${import.meta.env.BASE_URL}assets/logo.png`} alt="AlexosLifts Logo" className="w-full h-full object-cover" />
           </div>
           <div className="space-y-1">
             <h1 className="text-3xl font-bold tracking-tight">Welcome back, {profile?.username || 'Lifter'}</h1>
