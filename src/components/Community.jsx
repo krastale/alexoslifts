@@ -327,18 +327,34 @@ export function Community({ profile, addRoutine }) {
     const { data } = await supabase
       .from('game_scores')
       .select('*')
-      .in('user_id', friendIds)
-      .order('score', { ascending: false });
+      .in('user_id', friendIds);
     
     if (data) {
       const scoresMap = {};
       data.forEach(score => {
-        if (!scoresMap[score.user_id]) scoresMap[score.user_id] = [];
-        if (scoresMap[score.user_id].length < 3) { // keep top 3
-          scoresMap[score.user_id].push(score);
+        if (!scoresMap[score.user_id]) scoresMap[score.user_id] = {};
+        const gName = score.game_name;
+        
+        if (!scoresMap[score.user_id][gName]) {
+          scoresMap[score.user_id][gName] = score;
+        } else {
+          const currentBest = scoresMap[score.user_id][gName].score;
+          if (gName.includes('Reaction Time')) {
+             if (score.score < currentBest) scoresMap[score.user_id][gName] = score;
+          } else {
+             if (score.score > currentBest) scoresMap[score.user_id][gName] = score;
+          }
         }
       });
-      setFriendScores(scoresMap);
+      
+      const finalMap = {};
+      for (const [userId, games] of Object.entries(scoresMap)) {
+         finalMap[userId] = Object.values(games).sort((a, b) => {
+           if (a.game_name.includes('Reaction Time')) return 0; // Don't sub-sort yet
+           return b.score - a.score;
+         });
+      }
+      setFriendScores(finalMap);
     }
   };
 

@@ -23,10 +23,13 @@ function AppContent() {
 
   const [activeTab, setActiveTab] = useState('dashboard');
   const [activeWorkout, setActiveWorkout] = useState(null);
+  const [isWorkoutMinimized, setIsWorkoutMinimized] = useState(false);
 
   useEffect(() => {
     const handleStartWorkout = (e) => {
       setActiveWorkout(e.detail);
+      setIsWorkoutMinimized(false);
+      setActiveTab('dashboard'); // Switch to a tab that won't conflict visually
     };
     window.addEventListener('start-workout', handleStartWorkout);
     return () => window.removeEventListener('start-workout', handleStartWorkout);
@@ -46,21 +49,6 @@ function AppContent() {
 
   if (!profile && !dataLoading) {
     return <Onboarding onComplete={updateProfile} />;
-  }
-
-  if (activeWorkout) {
-    return (
-      <WorkoutLogger 
-        routine={activeWorkout} 
-        history={history}
-        onSave={async (workout) => {
-          await addHistory(workout);
-          setActiveWorkout(null);
-          setActiveTab('dashboard');
-        }} 
-        onCancel={() => setActiveWorkout(null)} 
-      />
-    );
   }
 
   const renderContent = () => {
@@ -101,7 +89,35 @@ function AppContent() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground max-w-5xl mx-auto border-x border-border/50 shadow-2xl shadow-black/50">
+    <div className="min-h-screen bg-background text-foreground max-w-5xl mx-auto border-x border-border/50 shadow-2xl shadow-black/50 relative">
+      {/* Active Workout Overlay */}
+      {activeWorkout && !isWorkoutMinimized && (
+        <div className="fixed inset-0 z-[100] bg-background">
+          <WorkoutLogger 
+            routine={activeWorkout} 
+            history={history}
+            onSave={async (workout) => {
+              await addHistory(workout);
+              setActiveWorkout(null);
+              setActiveTab('dashboard');
+            }} 
+            onCancel={() => setActiveWorkout(null)}
+            onMinimize={() => setIsWorkoutMinimized(true)}
+          />
+        </div>
+      )}
+
+      {/* Resume Workout Floating Button */}
+      {activeWorkout && isWorkoutMinimized && (
+        <button 
+          onClick={() => setIsWorkoutMinimized(false)}
+          className="fixed bottom-24 right-6 z-[90] bg-primary text-white p-4 rounded-full shadow-2xl shadow-primary/40 animate-bounce flex items-center gap-2 font-black uppercase tracking-tighter text-xs"
+        >
+          <Dumbbell className="w-5 h-5" />
+          Resume
+        </button>
+      )}
+
       <main className="min-h-screen">
         {renderContent()}
       </main>

@@ -75,19 +75,35 @@ function PlateCalculator({ weight, onClose }) {
   );
 }
 
-export function WorkoutLogger({ routine, history, onSave, onCancel }) {
+export function WorkoutLogger({ routine, history, onSave, onCancel, onMinimize }) {
   const { user } = useAuth();
+  
+  // Last Performance Logic: Accurately capture previous weight/reps for each set
+  const lastPerformances = useMemo(() => {
+    const last = {};
+    if (!history) return last;
+    const sortedHistory = [...history].sort((a, b) => new Date(b.date) - new Date(a.date));
+    sortedHistory.forEach(session => {
+      session.exercises?.forEach(ex => {
+        if (!last[ex.name]) last[ex.name] = ex.sets;
+      });
+    });
+    return last;
+  }, [history]);
+
   const [workout, setWorkout] = useState({
     routineName: routine.name,
     date: new Date().toISOString(),
     exercises: routine.exercises.map(ex => {
+      const prevSets = lastPerformances[ex.name] || [];
       const repPattern = String(ex.reps).split(',').map(r => parseInt(r.trim()) || 10);
+      
       return {
         name: ex.name,
         category: ex.category || 'arms',
         sets: Array.from({ length: ex.sets }, (_, i) => ({ 
-          weight: '', 
-          reps: repPattern[i] || repPattern[repPattern.length - 1] || 10, 
+          weight: prevSets[i]?.weight || '', 
+          reps: prevSets[i]?.reps || repPattern[i] || repPattern[repPattern.length - 1] || 10, 
           rpe: '', 
           completed: false 
         }))
@@ -98,41 +114,24 @@ export function WorkoutLogger({ routine, history, onSave, onCancel }) {
   const [startTime] = useState(Date.now());
   const [elapsed, setElapsed] = useState(0);
   const [isResting, setIsResting] = useState(false);
-  const [restTimeLeft, setRestTimeLeft] = useState(0);
+  const [restElapsed, setRestElapsed] = useState(0);
   const [showPlateCalc, setShowPlateCalc] = useState(null); // stores {weight}
 
-  // PR Logic: Calculate bests from history
+  // PR Logic: Now tracks { weight, reps }
   const personalBests = useMemo(() => {
     const bests = {};
     history?.forEach(session => {
       session.exercises?.forEach(ex => {
         ex.sets?.forEach(set => {
-          const w = parseFloat(set.weight);
-          if (w > (bests[ex.name] || 0)) {
-            bests[ex.name] = w;
+          const w = parseFloat(set.weight) || 0;
+          const r = parseInt(set.reps) || 0;
+          if (!bests[ex.name] || w > bests[ex.name].weight || (w === bests[ex.name].weight && r > bests[ex.name].reps)) {
+            bests[ex.name] = { weight: w, reps: r };
           }
         });
       });
     });
     return bests;
-  }, [history]);
-
-  // Last Performance Logic
-  const lastPerformances = useMemo(() => {
-    const last = {};
-    if (!history) return last;
-    
-    // Sort history by date descending just in case
-    const sortedHistory = [...history].sort((a, b) => new Date(b.date) - new Date(a.date));
-    
-    sortedHistory.forEach(session => {
-      session.exercises?.forEach(ex => {
-        if (!last[ex.name]) {
-          last[ex.name] = ex.sets;
-        }
-      });
-    });
-    return last;
   }, [history]);
 
   useEffect(() => {
@@ -144,19 +143,15 @@ export function WorkoutLogger({ routine, history, onSave, onCancel }) {
 
   useEffect(() => {
     let restInterval;
-    if (isResting && restTimeLeft > 0) {
+    if (isResting) {
       restInterval = setInterval(() => {
-        setRestTimeLeft(prev => {
-          if (prev <= 1) {
-            setIsResting(false);
-            return 0;
-          }
-          return prev - 1;
-        });
+        setRestElapsed(prev => prev + 1);
       }, 1000);
+    } else {
+      setRestElapsed(0);
     }
     return () => clearInterval(restInterval);
-  }, [isResting, restTimeLeft]);
+  }, [isResting]);
 
   const formatTime = (seconds) => {
     const h = Math.floor(seconds / 3600);
@@ -171,17 +166,47 @@ export function WorkoutLogger({ routine, history, onSave, onCancel }) {
     setWorkout(updated);
   };
 
+  const removeSet = (exIdx, setIdx) => {
+    const updated = { ...workout };
+    updated.exercises[exIdx].sets.splice(setIdx, 1);
+    if (updated.exercises[exIdx].sets.length === 0) {
+      updated.exercises.splice(exIdx, 1);
+    }
+    setWorkout(updated);
+  };
+
+  const removeExercise = (exIdx) => {
+    const updated = { ...workout };
+    updated.exercises.splice(exIdx, 1);
+    setWorkout(updated);
+  };
+
+  const addExercise = () => {
+    setWorkout({
+      ...workout,
+      exercises: [...workout.exercises, {
+        name: '',
+        category: 'arms',
+        sets: [{ weight: '', reps: 10, rpe: '', completed: false }]
+      }]
+    });
+  };
+
   const toggleSet = (exIdx, setIdx) => {
     const updated = { ...workout };
     const set = updated.exercises[exIdx].sets[setIdx];
     const willBeCompleted = !set.completed;
     
     if (willBeCompleted) {
-      const weight = parseFloat(set.weight);
+      const weight = parseFloat(set.weight) || 0;
+      const reps = parseInt(set.reps) || 0;
       const exerciseName = updated.exercises[exIdx].name;
+      const best = personalBests[exerciseName];
       
-      // PR Detection
-      if (weight > 0 && weight > (personalBests[exerciseName] || 0)) {
+      // Refined PR Detection: Weight > Max OR (Weight == Max AND Reps > MaxReps)
+      const isPR = weight > 0 && (!best || weight > best.weight || (weight === best.weight && reps > best.reps));
+      
+      if (isPR) {
         confetti({
           particleCount: 150,
           spread: 70,
@@ -192,7 +217,6 @@ export function WorkoutLogger({ routine, history, onSave, onCancel }) {
       }
       
       setIsResting(true);
-      setRestTimeLeft(60);
     } else {
       set.isPR = false;
     }
@@ -207,6 +231,7 @@ export function WorkoutLogger({ routine, history, onSave, onCancel }) {
     updated.exercises[exIdx].sets.push({ 
       weight: lastSet ? lastSet.weight : '', 
       reps: lastSet ? lastSet.reps : 10, 
+      rpe: '',
       completed: false 
     });
     setWorkout(updated);
@@ -215,196 +240,216 @@ export function WorkoutLogger({ routine, history, onSave, onCancel }) {
   const handleFinish = () => {
     onSave({
       ...workout,
-      duration: elapsed,
+      duration: Math.floor(elapsed / 60),
       date: new Date().toISOString()
     });
   };
 
   return (
-    <div className="min-h-screen bg-background pb-40">
-      {showPlateCalc && (
-        <PlateCalculator weight={showPlateCalc} onClose={() => setShowPlateCalc(null)} />
-      )}
-
-      <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-md border-b border-border p-4">
-        <div className="max-w-3xl mx-auto flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <button onClick={onCancel} className="p-2 hover:bg-secondary rounded-lg">
-              <ChevronLeft className="w-6 h-6" />
-            </button>
-            <div>
-              <h1 className="font-bold">{workout.routineName}</h1>
-              <p className="text-xs text-primary font-mono">{formatTime(elapsed)}</p>
-            </div>
+    <div className="flex flex-col h-screen bg-background">
+      {/* Header */}
+      <header className="p-4 border-b border-border flex items-center justify-between sticky top-0 bg-background/80 backdrop-blur-md z-[100]">
+        <div className="flex items-center gap-3">
+          <button onClick={onMinimize} className="p-2 hover:bg-secondary rounded-xl transition-colors text-primary">
+            <ChevronLeft className="w-6 h-6" />
+          </button>
+          <div>
+            <h2 className="font-black italic uppercase tracking-tighter text-lg leading-tight truncate max-w-[150px]">{workout.routineName}</h2>
+            <p className="text-[10px] font-bold text-primary uppercase tracking-[0.2em] tabular-nums">{formatTime(elapsed)}</p>
           </div>
-          <button
-            onClick={handleFinish}
-            className="bg-primary hover:bg-primary/90 text-white px-6 py-2 rounded-full font-bold transition-all shadow-lg shadow-primary/20"
+        </div>
+        <div className="flex gap-2">
+          <button 
+            onClick={onCancel}
+            className="p-2.5 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all"
+            title="Cancel Workout"
           >
+            <X className="w-5 h-5" />
+          </button>
+          <button 
+            onClick={handleFinish}
+            className="bg-primary text-white px-5 py-2.5 rounded-xl font-black uppercase tracking-widest text-xs flex items-center gap-2 shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all"
+          >
+            <Save className="w-4 h-4" />
             Finish
           </button>
         </div>
-      </div>
+      </header>
 
-      <div className="max-w-3xl mx-auto p-4 space-y-8 mt-4">
+      {/* Main Content */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-6 pb-40">
         {workout.exercises.map((ex, exIdx) => {
-          const best = personalBests[ex.name] || 0;
+          const best = personalBests[ex.name];
+          const bestText = best ? `${best.weight}kg x ${best.reps}` : 'No PR';
+
           return (
-            <div key={exIdx} className="space-y-4">
-              <div className="flex justify-between items-end">
-                <h2 className="text-xl font-bold text-primary flex items-center gap-2">
-                  <Play className="w-5 h-5 fill-primary" />
-                  {ex.name}
-                </h2>
-                {best > 0 && (
-                  <p className="text-[10px] font-bold text-muted-foreground uppercase flex items-center gap-1">
-                    <Trophy className="w-3 h-3 text-yellow-500" />
-                    Best: {best}kg
-                  </p>
-                )}
+            <div key={exIdx} className="bg-card border border-border rounded-[2.5rem] overflow-hidden shadow-sm">
+              <div className="p-5 border-b border-border bg-secondary/30 flex justify-between items-center">
+                <div className="flex-1">
+                  <input
+                    type="text"
+                    className="bg-transparent font-black italic uppercase tracking-tight text-xl outline-none focus:text-primary w-full"
+                    value={ex.name}
+                    onChange={(e) => {
+                      const updated = { ...workout };
+                      updated.exercises[exIdx].name = e.target.value;
+                      setWorkout(updated);
+                    }}
+                    placeholder="Exercise Name"
+                  />
+                  <div className="flex items-center gap-2 mt-1">
+                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{ex.category}</p>
+                    <span className="w-1 h-1 rounded-full bg-border" />
+                    <p className="text-[10px] font-bold text-primary uppercase tracking-widest flex items-center gap-1">
+                      <Trophy className="w-3 h-3 fill-primary" /> {bestText}
+                    </p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => removeExercise(exIdx)}
+                  className="p-3 text-muted-foreground hover:text-red-500 transition-colors"
+                  title="Remove Exercise"
+                >
+                  <Trash2 className="w-5 h-5" />
+                </button>
               </div>
               
-              <div className="space-y-2">
-                <div className="grid grid-cols-12 gap-2 px-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
-                  <div className="col-span-1 text-center">#</div>
-                  <div className="col-span-4 text-center">Weight</div>
-                  <div className="col-span-3 text-center">Reps</div>
-                  <div className="col-span-2 text-center">RPE</div>
-                  <div className="col-span-2 text-center">Done</div>
+              <div className="p-5 space-y-4">
+                <div className="grid grid-cols-[30px_1fr_1fr_45px_45px] gap-3 text-[10px] font-black text-muted-foreground uppercase tracking-widest px-2">
+                  <div>#</div>
+                  <div className="text-center">kg</div>
+                  <div className="text-center">Reps</div>
+                  <div className="text-center">RPE</div>
+                  <div></div>
                 </div>
 
                 {ex.sets.map((set, setIdx) => {
                   const lastSetData = lastPerformances[ex.name]?.[setIdx];
-                  
-                  // Intelligent Progression Logic
-                  let placeholderWeight = "0";
-                  let targetSubtext = null;
-                  
-                  if (lastSetData) {
-                    const lastWeight = parseFloat(lastSetData.weight) || 0;
-                    const lastReps = parseInt(lastSetData.reps) || 0;
-                    const lastRpe = parseInt(lastSetData.rpe) || 10;
-                    
-                    if (lastWeight > 0) {
-                      // If they hit the target reps and it wasn't max effort, suggest a small bump
-                      if (lastReps >= set.reps && lastRpe < 9) {
-                        placeholderWeight = `${lastWeight + 2.5}`;
-                        targetSubtext = "Target";
-                      } else {
-                        placeholderWeight = `${lastWeight}`;
-                        targetSubtext = "Last";
-                      }
-                    }
-                  }
+                  const placeholderWeight = lastSetData?.weight || "0";
+                  const placeholderReps = lastSetData?.reps || "0";
 
                   return (
-                    <div 
-                      key={setIdx} 
-                      className={`grid grid-cols-12 gap-2 items-center p-2 rounded-2xl transition-all ${
-                        set.completed ? 'bg-primary/5 opacity-60' : 'bg-card border border-border shadow-sm'
-                      }`}
-                    >
-                      <div className="col-span-1 text-center font-bold text-sm">
-                        {setIdx + 1}
-                      </div>
-                      <div className="col-span-4 relative group">
+                    <div key={setIdx} className={`grid grid-cols-[30px_1fr_1fr_45px_45px] gap-3 items-center transition-all ${set.completed ? 'opacity-40' : ''}`}>
+                      <div className="text-sm font-black italic text-muted-foreground/30">{setIdx + 1}</div>
+                      
+                      <div className="relative group">
                         <input
                           type="number"
-                          placeholder={placeholderWeight}
-                          className="w-full bg-secondary border border-border rounded-xl py-2.5 text-center text-sm font-bold outline-none focus:ring-2 focus:ring-primary"
+                          className="w-full bg-secondary border-none rounded-2xl py-3.5 px-2 text-center text-sm font-bold outline-none focus:ring-2 focus:ring-primary transition-all"
                           value={set.weight}
                           onChange={(e) => updateSet(exIdx, setIdx, 'weight', e.target.value)}
+                          placeholder={placeholderWeight}
                         />
-                        {targetSubtext && !set.weight && (
-                          <span className="absolute -top-1.5 left-1/2 -translate-x-1/2 bg-background px-1 text-[8px] font-bold text-primary uppercase whitespace-nowrap rounded">
-                            {targetSubtext}
-                          </span>
+                        {!set.weight && lastSetData && (
+                          <span className="absolute -top-1.5 left-1/2 -translate-x-1/2 bg-background px-1 text-[8px] font-black text-primary uppercase whitespace-nowrap rounded">Last</span>
                         )}
                         <button 
-                          onClick={() => setShowPlateCalc(parseFloat(set.weight) || 0)}
-                          className="absolute -top-2 -right-1 bg-background border border-border p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={() => setShowPlateCalc({ weight: parseFloat(set.weight) || parseFloat(placeholderWeight) || 0 })}
+                          className="absolute -bottom-1 -right-1 bg-card border border-border p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity z-10"
                         >
                           <Calculator className="w-3 h-3 text-primary" />
                         </button>
                       </div>
-                      <div className="col-span-3 relative">
+
+                      <div className="relative">
                         <input
                           type="number"
-                          placeholder={lastSetData ? `${lastSetData.reps}` : "0"}
-                          className="w-full bg-secondary border border-border rounded-xl py-2.5 text-center text-sm font-bold outline-none focus:ring-2 focus:ring-primary"
+                          className="w-full bg-secondary border-none rounded-2xl py-3.5 px-2 text-center text-sm font-bold outline-none focus:ring-2 focus:ring-primary transition-all"
                           value={set.reps}
                           onChange={(e) => updateSet(exIdx, setIdx, 'reps', e.target.value)}
+                          placeholder={placeholderReps}
                         />
-                      </div>
-                      <div className="col-span-2 relative group">
-                        <input
-                          type="number"
-                          min="1" max="10"
-                          placeholder="-"
-                          className="w-full bg-secondary border border-border rounded-xl py-2.5 text-center text-sm font-bold outline-none focus:ring-2 focus:ring-primary"
-                          value={set.rpe || ''}
-                          onChange={(e) => updateSet(exIdx, setIdx, 'rpe', e.target.value)}
-                        />
-                        <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-card border border-border text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-10 transition-opacity shadow-xl">
-                          RPE (1-10)
-                        </div>
-                      </div>
-                      <div className="col-span-2 flex justify-center relative">
-                        {set.isPR && (
-                          <div className="absolute -top-3 -right-1 animate-bounce">
-                            <Trophy className="w-5 h-5 text-yellow-500 fill-yellow-500 shadow-xl" />
-                          </div>
+                        {!set.reps && lastSetData && (
+                          <span className="absolute -top-1.5 left-1/2 -translate-x-1/2 bg-background px-1 text-[8px] font-black text-primary uppercase whitespace-nowrap rounded">Last</span>
                         )}
+                      </div>
+
+                      <input
+                        type="number"
+                        className="w-full bg-secondary border-none rounded-2xl py-3.5 px-1 text-center text-xs font-bold outline-none focus:ring-1 focus:ring-primary transition-all"
+                        value={set.rpe}
+                        onChange={(e) => updateSet(exIdx, setIdx, 'rpe', e.target.value)}
+                        placeholder="-"
+                      />
+
+                      <div className="flex items-center gap-1.5 h-full">
                         <button
                           onClick={() => toggleSet(exIdx, setIdx)}
-                          className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${
-                            set.completed 
-                              ? 'bg-green-500 text-white shadow-lg shadow-green-500/20' 
-                              : 'bg-secondary text-muted-foreground hover:bg-secondary/80'
+                          className={`w-full h-full rounded-2xl flex items-center justify-center transition-all ${
+                            set.completed ? 'bg-green-500 text-white' : 'bg-primary/10 text-primary hover:bg-primary/20'
                           }`}
                         >
-                          <Check className="w-6 h-6" />
+                          <Check className="w-5 h-5" />
+                        </button>
+                        <button 
+                          onClick={() => removeSet(exIdx, setIdx)}
+                          className="text-muted-foreground/30 hover:text-red-500 transition-colors"
+                        >
+                          <X className="w-4 h-4" />
                         </button>
                       </div>
                     </div>
                   );
                 })}
-                
+
                 <button
                   onClick={() => addSet(exIdx)}
-                  className="w-full py-3 bg-secondary/30 hover:bg-secondary/50 border border-dashed border-border rounded-2xl text-xs font-bold uppercase tracking-widest text-muted-foreground transition-all mt-2"
+                  className="w-full py-4 border-2 border-dashed border-border rounded-3xl text-xs font-black uppercase tracking-widest text-muted-foreground hover:text-primary hover:border-primary transition-all flex items-center justify-center gap-2"
                 >
-                  + Add Set
+                  <Plus className="w-4 h-4" />
+                  Add Set
                 </button>
               </div>
             </div>
           );
         })}
+
+        <button
+          onClick={addExercise}
+          className="w-full py-5 bg-secondary/50 border-2 border-dashed border-border rounded-[2.5rem] text-sm font-black uppercase tracking-[0.3em] text-muted-foreground hover:text-primary hover:border-primary transition-all flex flex-col items-center justify-center gap-2"
+        >
+          <Plus className="w-6 h-6" />
+          Add Exercise
+        </button>
       </div>
 
-      {/* Rest Timer Overlay */}
+      {/* Plate Calculator Overlay */}
+      {showPlateCalc && (
+        <PlateCalculator weight={showPlateCalc.weight} onClose={() => setShowPlateCalc(null)} />
+      )}
+
+      {/* Rest Timer Modal */}
       {isResting && (
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/95 backdrop-blur-xl border-t border-border z-20 animate-in slide-in-from-bottom-full duration-500 shadow-[0_-15px_50px_-15px_rgba(0,0,0,0.6)]">
-          <div className="max-w-3xl mx-auto space-y-6">
-            <div className="flex justify-between items-center">
-              <div className="flex items-center gap-4">
-                <div className="bg-primary/20 p-3 rounded-2xl text-primary animate-pulse">
-                  <Timer className="w-8 h-8" />
-                </div>
-                <div>
-                  <h3 className="font-black text-xl uppercase tracking-tighter italic">Rest Time</h3>
-                  <p className="text-primary font-mono text-3xl leading-none">{formatTime(restTimeLeft)}</p>
-                </div>
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[150] flex items-center justify-center p-6">
+          <div className="w-full max-w-sm bg-card border border-border rounded-[3rem] p-8 text-center space-y-8 animate-in zoom-in-95 duration-300">
+            <div className="space-y-2">
+              <div className="flex items-center justify-center gap-2 text-primary">
+                <Timer className="w-5 h-5 animate-pulse" />
+                <h3 className="text-sm font-black uppercase tracking-[0.3em]">Rest Active</h3>
               </div>
+              <p className="text-7xl font-black italic tracking-tighter tabular-nums text-white">
+                {formatTime(restElapsed)}
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-3">
               <button 
                 onClick={() => setIsResting(false)}
-                className="bg-secondary px-6 py-3 rounded-2xl text-sm font-black uppercase tracking-widest hover:bg-secondary/80 transition-all active:scale-95"
+                className="w-full py-5 bg-primary text-white font-black uppercase tracking-widest rounded-[2rem] shadow-2xl shadow-primary/30 active:scale-95 transition-all"
               >
-                Skip
+                End Rest
+              </button>
+              <button 
+                onClick={() => setIsResting(false)}
+                className="w-full py-4 text-muted-foreground font-bold text-sm hover:text-white transition-colors"
+              >
+                Skip Timer
               </button>
             </div>
 
-            <RestMinigames user={user} />
+            <div className="pt-4 border-t border-border/50">
+              <RestMinigames user={user} />
+            </div>
           </div>
         </div>
       )}
