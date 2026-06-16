@@ -91,8 +91,8 @@ function AppContent() {
   return (
     <div className="min-h-screen bg-background text-foreground max-w-5xl mx-auto border-x border-border/50 shadow-2xl shadow-black/50 relative">
       {/* Active Workout Overlay */}
-      {activeWorkout && !isWorkoutMinimized && (
-        <div className="fixed inset-0 z-[100] bg-background">
+      {activeWorkout && (
+        <div className={`fixed inset-0 z-[100] bg-background ${isWorkoutMinimized ? 'hidden' : ''}`}>
           <WorkoutLogger 
             routine={activeWorkout} 
             history={history}
