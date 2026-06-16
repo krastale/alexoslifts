@@ -145,9 +145,14 @@ export function Dashboard({ profile, history, deleteHistory }) {
   return (
     <div className="p-6 space-y-8 pb-32 lg:pb-12">
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="space-y-1">
-          <h1 className="text-3xl font-bold tracking-tight">Welcome back, {profile?.username || 'Lifter'}</h1>
-          <p className="text-muted-foreground font-medium">Keep crushing those goals.</p>
+        <div className="flex items-center gap-4">
+          <div className="w-14 h-14 rounded-2xl overflow-hidden shadow-md border border-border/50 shrink-0">
+            <img src="/assets/logo.png" alt="AlexosLifts Logo" className="w-full h-full object-cover" />
+          </div>
+          <div className="space-y-1">
+            <h1 className="text-3xl font-bold tracking-tight">Welcome back, {profile?.username || 'Lifter'}</h1>
+            <p className="text-muted-foreground font-medium">Keep crushing those goals.</p>
+          </div>
         </div>
         
         <div className="flex gap-1 p-1 bg-secondary/50 rounded-xl self-start">
