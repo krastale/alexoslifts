@@ -4,13 +4,6 @@ import { useAuth } from '../contexts/AuthContext';
 import { RestMinigames } from './Minigames';
 import confetti from 'canvas-confetti';
 
-// Helper for 1RM calculation (Brzycki Formula)
-const calculate1RM = (weight, reps) => {
-  if (!weight || !reps || reps <= 0) return 0;
-  if (reps === 1) return weight;
-  return weight * (36 / (37 - reps));
-};
-
 function PlateCalculator({ weight, onClose }) {
   const barWeight = 20; // Default Olympic Bar
   const targetSide = (weight - barWeight) / 2;

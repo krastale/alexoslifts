@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ChevronLeft, ChevronRight, Dumbbell } from 'lucide-react';
 
-export function WorkoutCalendar({ history, profile }) {
+export function WorkoutCalendar({ history }) {
   const [currentDate, setCurrentDate] = useState(new Date());
 
   const daysInMonth = (year, month) => new Date(year, month + 1, 0).getDate();

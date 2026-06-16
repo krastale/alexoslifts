@@ -140,7 +140,7 @@ export function Progress({ profile, updateProfile, history, measurements, addMea
           <CalendarIcon className="w-5 h-5 text-muted-foreground" />
           Workout Calendar
         </h2>
-        <WorkoutCalendar history={history} profile={profile} />
+        <WorkoutCalendar history={history} />
       </section>
 
       {/* Measurements Section */}

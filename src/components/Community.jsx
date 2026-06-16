@@ -289,8 +289,6 @@ export function Community({ profile, addRoutine }) {
         throw error;
       }
 
-      console.log('Friendship data fetched:', data);
-
       if (data) {
         const accepted = [];
         const incoming = [];

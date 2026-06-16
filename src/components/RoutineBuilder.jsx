@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Plus, Trash2, Dumbbell, Save, X, Share2, Download, Library, User, Globe, Lock, Edit2, ChevronUp, ChevronDown } from 'lucide-react';
 
 export const EXERCISE_CATEGORIES = [
