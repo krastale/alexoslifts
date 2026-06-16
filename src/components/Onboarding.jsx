@@ -67,15 +67,15 @@ export function Onboarding({ onComplete }) {
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-6 bg-background">
-      <div className="w-full max-w-md p-8 rounded-2xl bg-card border border-border shadow-xl">
+      <div className="w-full max-w-md p-8 rounded-3xl bg-card border border-border shadow-2xl">
         <div className="flex justify-center mb-6">
-          <div className="p-3 bg-primary/10 rounded-full">
-            <Activity className="w-10 h-10 text-primary" />
+          <div className="w-24 h-24 rounded-3xl overflow-hidden shadow-lg border border-border/50">
+            <img src="/assets/logo.png" alt="AlexosLifts Logo" className="w-full h-full object-cover" />
           </div>
         </div>
         
-        <h1 className="text-3xl font-bold text-center mb-2">Welcome to AlexosLifts</h1>
-        <p className="text-muted-foreground text-center mb-8">Let's set up your profile to start tracking your progress.</p>
+        <h1 className="text-3xl font-black italic uppercase tracking-tighter text-center mb-2">Welcome to AlexosLifts</h1>
+        <p className="text-muted-foreground text-center mb-8 font-bold text-sm">Let's set up your profile to start tracking your progress.</p>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
