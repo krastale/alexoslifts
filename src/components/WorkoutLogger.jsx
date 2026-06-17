@@ -4,6 +4,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { RestMinigames } from './Minigames';
 import confetti from 'canvas-confetti';
 
+import { EXERCISE_CATEGORIES } from './RoutineBuilder';
+
 function PlateCalculator({ weight, onClose }) {
   const barWeight = 20; // Default Olympic Bar
   const targetSide = (weight - barWeight) / 2;
@@ -84,6 +86,28 @@ export function WorkoutLogger({ routine, history, onSave, onCancel, onMinimize }
     return last;
   }, [history]);
 
+  // Smart Memory: Map weight -> reps for dynamic suggestions
+  const exerciseHistoryIndex = useMemo(() => {
+    const index = {};
+    if (!history) return index;
+    history.forEach(session => {
+      session.exercises?.forEach(ex => {
+        if (!index[ex.name]) index[ex.name] = { weightsToReps: {} };
+        ex.sets?.forEach(set => {
+          const w = parseFloat(set.weight) || 0;
+          const r = parseInt(set.reps) || 0;
+          if (w > 0) {
+            // Keep the first (most recent) reps seen for this weight
+            if (index[ex.name].weightsToReps[w] === undefined) {
+              index[ex.name].weightsToReps[w] = r;
+            }
+          }
+        });
+      });
+    });
+    return index;
+  }, [history]);
+
   const [workout, setWorkout] = useState({
     routineName: routine.name,
     date: new Date().toISOString(),
@@ -94,6 +118,7 @@ export function WorkoutLogger({ routine, history, onSave, onCancel, onMinimize }
       return {
         name: ex.name,
         category: ex.category || 'arms',
+        type: ex.type || 'main',
         sets: Array.from({ length: ex.sets }, (_, i) => ({ 
           weight: prevSets[i]?.weight || '', 
           reps: prevSets[i]?.reps || repPattern[i] || repPattern[repPattern.length - 1] || 10, 
@@ -103,6 +128,40 @@ export function WorkoutLogger({ routine, history, onSave, onCancel, onMinimize }
       };
     })
   });
+
+  const autoComplete = (exIdx) => {
+    const updated = { ...workout };
+    const ex = updated.exercises[exIdx];
+    
+    ex.sets = ex.sets.map((set, setIdx) => {
+      const lastSetData = lastPerformances[ex.name]?.[setIdx];
+      const placeholderWeight = lastSetData?.weight || "0";
+      const placeholderReps = lastSetData?.reps || "0";
+      
+      return {
+        ...set,
+        weight: set.weight || placeholderWeight,
+        reps: set.reps || placeholderReps,
+        completed: true
+      };
+    });
+    setWorkout(updated);
+  };
+
+  const swapExercise = (exIdx) => {
+    const updated = { ...workout };
+    const newName = prompt('Enter new exercise name:', updated.exercises[exIdx].name);
+    if (newName && newName.trim() !== '') {
+      updated.exercises[exIdx].name = newName.trim();
+      updated.exercises[exIdx].sets = updated.exercises[exIdx].sets.map(set => ({
+        ...set,
+        weight: '',
+        reps: '',
+        completed: false
+      }));
+      setWorkout(updated);
+    }
+  };
 
   const [startTime] = useState(Date.now());
   const [elapsed, setElapsed] = useState(0);
@@ -155,7 +214,20 @@ export function WorkoutLogger({ routine, history, onSave, onCancel, onMinimize }
 
   const updateSet = (exIdx, setIdx, field, value) => {
     const updated = { ...workout };
-    updated.exercises[exIdx].sets[setIdx][field] = value;
+    const set = updated.exercises[exIdx].sets[setIdx];
+    set[field] = value;
+
+    // Smart Auto-fill: If typing weight and reps is empty, try to fill reps
+    if (field === 'weight' && value !== '') {
+      const numW = parseFloat(value);
+      const exName = updated.exercises[exIdx].name;
+      if (numW && exerciseHistoryIndex[exName]?.weightsToReps[numW] !== undefined) {
+        if (!set.reps) {
+          set.reps = String(exerciseHistoryIndex[exName].weightsToReps[numW]);
+        }
+      }
+    }
+
     setWorkout(updated);
   };
 
@@ -277,38 +349,74 @@ export function WorkoutLogger({ routine, history, onSave, onCancel, onMinimize }
       <div className="flex-1 overflow-y-auto p-4 space-y-6 pb-40">
         {workout.exercises.map((ex, exIdx) => {
           const best = personalBests[ex.name];
-          const bestText = best ? `${best.weight}kg x ${best.reps}` : 'No PR';
+          const hasPR = best && best.weight > 0;
+          const bestText = hasPR ? `${best.weight}kg x ${best.reps}` : 'No PR';
 
           return (
             <div key={exIdx} className="bg-card border border-border rounded-[2.5rem] overflow-hidden shadow-sm">
-              <div className="p-5 border-b border-border bg-secondary/30 flex justify-between items-center">
-                <div className="flex-1">
-                  <input
-                    type="text"
-                    className="bg-transparent font-black italic uppercase tracking-tight text-xl outline-none focus:text-primary w-full"
-                    value={ex.name}
-                    onChange={(e) => {
-                      const updated = { ...workout };
-                      updated.exercises[exIdx].name = e.target.value;
-                      setWorkout(updated);
-                    }}
-                    placeholder="Exercise Name"
-                  />
-                  <div className="flex items-center gap-2 mt-1">
-                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{ex.category}</p>
-                    <span className="w-1 h-1 rounded-full bg-border" />
-                    <p className="text-[10px] font-bold text-primary uppercase tracking-widest flex items-center gap-1">
-                      <Trophy className="w-3 h-3 fill-primary" /> {bestText}
-                    </p>
+              <div className="p-5 border-b border-border bg-secondary/30 flex flex-col gap-4">
+                <div className="flex justify-between items-start gap-4">
+                  <div className="flex-1">
+                    <input
+                      type="text"
+                      className="bg-transparent font-black italic uppercase tracking-tight text-xl outline-none focus:text-primary w-full"
+                      value={ex.name}
+                      onChange={(e) => {
+                        const updated = { ...workout };
+                        updated.exercises[exIdx].name = e.target.value;
+                        setWorkout(updated);
+                      }}
+                      placeholder="Exercise Name"
+                    />
+                    <div className="flex flex-wrap items-center gap-2 mt-2">
+                      <select
+                        className="bg-transparent text-[10px] font-bold text-muted-foreground uppercase tracking-widest outline-none focus:text-primary cursor-pointer border-none p-0"
+                        value={ex.category || 'arms'}
+                        onChange={(e) => {
+                          const updated = { ...workout };
+                          updated.exercises[exIdx].category = e.target.value;
+                          setWorkout(updated);
+                        }}
+                      >
+                        {EXERCISE_CATEGORIES.map(cat => (
+                          <option key={cat} value={cat}>{cat}</option>
+                        ))}
+                      </select>
+                      <span className="w-1 h-1 rounded-full bg-border" />
+                      {hasPR ? (
+                        <p className="text-[10px] font-bold text-primary uppercase tracking-widest flex items-center gap-1">
+                          <Trophy className="w-3 h-3 fill-primary" /> {bestText}
+                        </p>
+                      ) : (
+                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">No PR</p>
+                      )}
+                    </div>
                   </div>
+                  <button 
+                    onClick={() => removeExercise(exIdx)}
+                    className="p-3 text-muted-foreground hover:text-red-500 transition-colors shrink-0"
+                    title="Remove Exercise"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
                 </div>
-                <button 
-                  onClick={() => removeExercise(exIdx)}
-                  className="p-3 text-muted-foreground hover:text-red-500 transition-colors"
-                  title="Remove Exercise"
-                >
-                  <Trash2 className="w-5 h-5" />
-                </button>
+                
+                {ex.type === 'additional' && (
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => swapExercise(exIdx)}
+                      className="flex-1 bg-secondary hover:bg-secondary/80 text-primary font-bold text-xs py-2 rounded-xl transition-all"
+                    >
+                      Swap Exercise
+                    </button>
+                    <button 
+                      onClick={() => autoComplete(exIdx)}
+                      className="flex-1 bg-primary hover:bg-primary/90 text-white font-bold text-xs py-2 rounded-xl transition-all"
+                    >
+                      Auto-Complete
+                    </button>
+                  </div>
+                )}
               </div>
               
               <div className="p-5 space-y-4">

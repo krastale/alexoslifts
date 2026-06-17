@@ -43,14 +43,14 @@ export function RoutineBuilder({ routines, addRoutine, deleteRoutine, updateRout
   const [newRoutine, setNewRoutine] = useState({
     name: '',
     is_public: true,
-    exercises: [{ name: '', sets: 3, reps: 10, category: 'arms' }]
+    exercises: [{ name: '', sets: 3, reps: 10, category: 'arms', type: 'main' }]
   });
 
   const handleAddExercise = () => {
     const target = editingRoutine || newRoutine;
     const updated = {
       ...target,
-      exercises: [...target.exercises, { name: '', sets: 3, reps: 10, category: 'arms' }]
+      exercises: [...target.exercises, { name: '', sets: 3, reps: 10, category: 'arms', type: 'main' }]
     };
     editingRoutine ? setEditingRoutine(updated) : setNewRoutine(updated);
   };
@@ -245,6 +245,17 @@ export function RoutineBuilder({ routines, addRoutine, deleteRoutine, updateRout
                         {EXERCISE_CATEGORIES.map(cat => (
                           <option key={cat} value={cat}>{cat}</option>
                         ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-muted-foreground mb-1">Type</label>
+                      <select
+                        className="w-full bg-secondary border border-border rounded-lg py-2 px-3 outline-none focus:ring-1 focus:ring-primary appearance-none"
+                        value={ex.type || 'main'}
+                        onChange={(e) => handleExerciseChange(idx, 'type', e.target.value)}
+                      >
+                        <option value="main">Main Exercise</option>
+                        <option value="additional">Additional (Swap/Auto)</option>
                       </select>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
