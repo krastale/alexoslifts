@@ -27,6 +27,137 @@ const identifyMuscleGroup = (name = '') => {
   return 'other';
 };
 
+const MuscleHeatmap = ({ muscleData }) => {
+  // Convert muscleData array into a lookup object for quick percentage checks
+  const percentages = useMemo(() => {
+    const map = {};
+    muscleData?.forEach(m => {
+      map[m.name] = m.percentage;
+    });
+    return map;
+  }, [muscleData]);
+
+  const getMuscleProps = (name) => {
+    const pct = percentages[name] || 0;
+    const color = MUSCLE_COLORS[name] || '#71717a';
+    const intensity = Math.min(pct / 40, 1.0); // max intensity at 40% focus
+    return {
+      fill: pct > 0 ? color : 'none',
+      fillOpacity: pct > 0 ? 0.2 + intensity * 0.8 : 0.05,
+      stroke: pct > 0 ? color : '#3f3f46',
+      strokeWidth: pct > 0 ? '1.5' : '1',
+      filter: pct > 0 ? 'url(#neonGlow)' : 'none',
+      style: { transition: 'all 0.5s ease-in-out' }
+    };
+  };
+
+  const getGenericProps = () => ({
+    fill: '#27272a',
+    fillOpacity: 0.1,
+    stroke: '#3f3f46',
+    strokeWidth: '1'
+  });
+
+  return (
+    <div className="flex gap-4 justify-center items-center select-none bg-secondary/15 p-4 rounded-3xl border border-border/40 shrink-0">
+      {/* Front View */}
+      <div className="flex flex-col items-center gap-2">
+        <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Front</span>
+        <svg width="100" height="220" viewBox="0 0 100 220" className="overflow-visible">
+          <defs>
+            <filter id="neonGlow" x="-50%" y="-50%" width="200%" height="200%">
+              <feGaussianBlur stdDeviation="3" result="blur" />
+              <feComponentTransfer in="blur" result="glow">
+                <feFuncA type="linear" slope="0.6"/>
+              </feComponentTransfer>
+              <feMerge>
+                <feMergeNode in="glow"/>
+                <feMergeNode in="SourceGraphic"/>
+              </feMerge>
+            </filter>
+          </defs>
+
+          {/* Background Outlines / Head / Neck */}
+          <circle cx="50" cy="22" r="9" {...getGenericProps()} />
+          <rect x="46" y="31" width="8" height="9" rx="1" {...getGenericProps()} />
+
+          {/* Traps */}
+          <path d="M 35,40 L 46,31 L 54,31 L 65,40 Z" {...getGenericProps()} />
+
+          {/* Shoulders */}
+          <path d="M 32,40 L 23,43 L 20,55 L 29,55 Z" {...getMuscleProps('shoulders')} />
+          <path d="M 68,40 L 77,43 L 80,55 L 71,55 Z" {...getMuscleProps('shoulders')} />
+
+          {/* Chest */}
+          <path d="M 50,60 L 33,56 L 29,40 L 50,40 Z" {...getMuscleProps('chest')} />
+          <path d="M 50,60 L 67,56 L 71,40 L 50,40 Z" {...getMuscleProps('chest')} />
+
+          {/* Abs */}
+          <path d="M 33,61 L 67,61 L 63,80 L 57,105 L 43,105 L 37,80 Z" {...getMuscleProps('abs')} />
+
+          {/* Arms (Biceps) */}
+          <path d="M 20,56 L 27,56 L 23,88 L 17,88 Z" {...getMuscleProps('arms')} />
+          <path d="M 80,56 L 73,56 L 77,88 L 83,88 Z" {...getMuscleProps('arms')} />
+
+          {/* Forearms */}
+          <path d="M 17,89 L 23,89 L 19,125 L 14,125 Z" {...getMuscleProps('forearms')} />
+          <path d="M 83,89 L 77,89 L 81,125 L 86,125 Z" {...getMuscleProps('forearms')} />
+
+          {/* Thighs (Quads) */}
+          <path d="M 32,111 L 49,111 L 45,160 L 33,160 Z" {...getMuscleProps('legs')} />
+          <path d="M 68,111 L 51,111 L 55,160 L 67,160 Z" {...getMuscleProps('legs')} />
+
+          {/* Calves */}
+          <path d="M 33,162 L 45,162 L 42,205 L 34,205 Z" {...getMuscleProps('legs')} />
+          <path d="M 67,162 L 55,162 L 58,205 L 66,205 Z" {...getMuscleProps('legs')} />
+        </svg>
+      </div>
+
+      {/* Back View */}
+      <div className="flex flex-col items-center gap-2">
+        <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Back</span>
+        <svg width="100" height="220" viewBox="0 0 100 220" className="overflow-visible">
+          {/* Head & Neck */}
+          <circle cx="50" cy="22" r="9" {...getGenericProps()} />
+          <rect x="46" y="31" width="8" height="9" rx="1" {...getGenericProps()} />
+
+          {/* Traps */}
+          <path d="M 35,40 L 46,31 L 54,31 L 65,40 Z" {...getGenericProps()} />
+
+          {/* Shoulders */}
+          <path d="M 32,40 L 23,43 L 20,55 L 29,55 Z" {...getMuscleProps('shoulders')} />
+          <path d="M 68,40 L 77,43 L 80,55 L 71,55 Z" {...getMuscleProps('shoulders')} />
+
+          {/* Back (Upper / Lats) */}
+          <path d="M 50,40 L 32,40 L 30,62 L 35,80 L 50,75 Z" {...getMuscleProps('back')} />
+          <path d="M 50,40 L 68,40 L 70,62 L 65,80 L 50,75 Z" {...getMuscleProps('back')} />
+          <path d="M 35,81 L 65,81 L 60,105 L 40,105 Z" {...getMuscleProps('back')} />
+
+          {/* Glutes */}
+          <path d="M 32,106 L 50,106 L 50,126 L 31,126 Z" {...getMuscleProps('gluteus')} />
+          <path d="M 68,106 L 50,106 L 50,126 L 69,126 Z" {...getMuscleProps('gluteus')} />
+
+          {/* Arms (Triceps) */}
+          <path d="M 20,56 L 27,56 L 23,88 L 17,88 Z" {...getMuscleProps('arms')} />
+          <path d="M 80,56 L 73,56 L 77,88 L 83,88 Z" {...getMuscleProps('arms')} />
+
+          {/* Forearms */}
+          <path d="M 17,89 L 23,89 L 19,125 L 14,125 Z" {...getMuscleProps('forearms')} />
+          <path d="M 83,89 L 77,89 L 81,125 L 86,125 Z" {...getMuscleProps('forearms')} />
+
+          {/* Hamstrings */}
+          <path d="M 31,127 L 49,127 L 45,160 L 33,160 Z" {...getMuscleProps('legs')} />
+          <path d="M 69,127 L 51,127 L 55,160 L 67,160 Z" {...getMuscleProps('legs')} />
+
+          {/* Calves */}
+          <path d="M 33,162 L 45,162 L 42,205 L 34,205 Z" {...getMuscleProps('legs')} />
+          <path d="M 67,162 L 55,162 L 58,205 L 66,205 Z" {...getMuscleProps('legs')} />
+        </svg>
+      </div>
+    </div>
+  );
+};
+
 export function Dashboard({ profile, history, deleteHistory, addHistory }) {
   const [timeRange, setTimeRange] = useState('all');
 
@@ -421,43 +552,47 @@ export function Dashboard({ profile, history, deleteHistory, addHistory }) {
             Muscle Focus Split
           </h2>
           {stats && stats.muscleData.length > 0 ? (
-            <div className="flex flex-col md:flex-row items-center gap-6">
-              <div className="h-48 w-48">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={stats.muscleData}
-                      innerRadius={55}
-                      outerRadius={75}
-                      paddingAngle={5}
-                      dataKey="value"
-                    >
-                      {stats.muscleData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={MUSCLE_COLORS[entry.name] || MUSCLE_COLORS['other']} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="flex-1 w-full space-y-3">
-                {stats.muscleData.map((m) => (
-                  <div key={m.name} className="space-y-1">
-                    <div className="flex justify-between text-xs font-bold uppercase tracking-wider">
-                      <span className="capitalize">{m.name}</span>
-                      <span className="text-muted-foreground">{m.percentage}%</span>
+            <div className="flex flex-col xl:flex-row items-center justify-center gap-8">
+              <MuscleHeatmap muscleData={stats.muscleData} />
+              
+              <div className="flex-1 w-full flex flex-col sm:flex-row items-center gap-6">
+                <div className="h-48 w-48 shrink-0 mx-auto">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={stats.muscleData}
+                        innerRadius={55}
+                        outerRadius={75}
+                        paddingAngle={5}
+                        dataKey="value"
+                      >
+                        {stats.muscleData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={MUSCLE_COLORS[entry.name] || MUSCLE_COLORS['other']} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="flex-1 w-full space-y-3">
+                  {stats.muscleData.map((m) => (
+                    <div key={m.name} className="space-y-1">
+                      <div className="flex justify-between text-xs font-bold uppercase tracking-wider">
+                        <span className="capitalize">{m.name}</span>
+                        <span className="text-muted-foreground">{m.percentage}%</span>
+                      </div>
+                      <div className="h-1.5 w-full bg-secondary rounded-full overflow-hidden">
+                        <div 
+                          className="h-full rounded-full transition-all duration-1000" 
+                          style={{ 
+                            width: `${m.percentage}%`, 
+                            backgroundColor: MUSCLE_COLORS[m.name] || MUSCLE_COLORS['other'] 
+                          }} 
+                        />
+                      </div>
                     </div>
-                    <div className="h-1.5 w-full bg-secondary rounded-full overflow-hidden">
-                      <div 
-                        className="h-full rounded-full transition-all duration-1000" 
-                        style={{ 
-                          width: `${m.percentage}%`, 
-                          backgroundColor: MUSCLE_COLORS[m.name] || MUSCLE_COLORS['other'] 
-                        }} 
-                      />
-                    </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             </div>
           ) : (
