@@ -21,6 +21,27 @@ function PlateCalculator({ weight, onClose }) {
     }
   });
 
+  const getPlateStyle = (plate) => {
+    switch (plate) {
+      case 25:
+        return { height: 'h-28', width: 'w-4', bg: 'bg-red-500 border-red-700', textColor: 'text-red-100', label: '25' };
+      case 20:
+        return { height: 'h-28', width: 'w-4', bg: 'bg-blue-500 border-blue-700', textColor: 'text-blue-100', label: '20' };
+      case 15:
+        return { height: 'h-24', width: 'w-3.5', bg: 'bg-yellow-500 border-yellow-700', textColor: 'text-yellow-950', label: '15' };
+      case 10:
+        return { height: 'h-22', width: 'w-3.5', bg: 'bg-green-600 border-green-800', textColor: 'text-green-100', label: '10' };
+      case 5:
+        return { height: 'h-18', width: 'w-3', bg: 'bg-zinc-200 border-zinc-400', textColor: 'text-zinc-800', label: '5' };
+      case 2.5:
+        return { height: 'h-14', width: 'w-3', bg: 'bg-zinc-800 border-zinc-950', textColor: 'text-zinc-300', label: '2.5' };
+      case 1.25:
+        return { height: 'h-10', width: 'w-2.5', bg: 'bg-zinc-400 border-zinc-500', textColor: 'text-zinc-900', label: '1.2' };
+      default:
+        return { height: 'h-10', width: 'w-2', bg: 'bg-zinc-500 border-zinc-600', textColor: 'text-white', label: '' };
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-card border border-border w-full max-w-sm rounded-3xl p-6 space-y-6 shadow-2xl animate-in zoom-in-95 duration-200">
@@ -37,6 +58,39 @@ function PlateCalculator({ weight, onClose }) {
         <div className="text-center space-y-1">
           <p className="text-4xl font-black text-primary">{weight} <span className="text-sm font-normal text-muted-foreground uppercase tracking-widest">kg</span></p>
           <p className="text-xs text-muted-foreground">Using 20kg Standard Barbell</p>
+        </div>
+
+        {/* 2D Barbell Plate Visualizer */}
+        <div className="relative flex items-center justify-center py-6 bg-secondary/15 border border-border/40 rounded-2xl overflow-hidden min-h-[130px] shadow-inner">
+          {/* Barbell Sleeve */}
+          <div className="absolute left-6 right-6 h-3 bg-zinc-700 rounded-full"></div>
+          
+          {/* Collar (Stopper) */}
+          <div className="absolute left-10 w-4 h-24 bg-zinc-800 border border-zinc-700 rounded-md z-10 flex items-center justify-center">
+            <div className="w-1.5 h-full bg-zinc-900"></div>
+          </div>
+          
+          {/* Stacked Plates */}
+          <div className="absolute left-[56px] flex items-center gap-[2px] z-20">
+            {platesNeeded.length > 0 ? (
+              platesNeeded.map((p, idx) => {
+                const info = getPlateStyle(p);
+                return (
+                  <div 
+                    key={idx} 
+                    className={`${info.height} ${info.width} ${info.bg} border rounded-md flex items-center justify-center shadow-lg relative group transition-all duration-300 hover:scale-105`}
+                    title={`${p} kg Plate`}
+                  >
+                    <span className={`text-[8px] font-black tracking-tighter select-none pointer-events-none origin-center rotate-90 whitespace-nowrap ${info.textColor}`}>
+                      {info.label}
+                    </span>
+                  </div>
+                );
+              })
+            ) : (
+              <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-4">Empty Sleeve</span>
+            )}
+          </div>
         </div>
 
         <div className="space-y-3">

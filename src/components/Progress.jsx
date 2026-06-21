@@ -3,7 +3,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer 
 } from 'recharts';
 import { 
-  Plus, Camera, Trash2, Ruler, TrendingUp, Sparkles, Loader2, Calendar as CalendarIcon, ChevronDown, ChevronUp, Settings2 
+  Plus, Camera, Trash2, Ruler, TrendingUp, Sparkles, Loader2, Calendar as CalendarIcon, ChevronDown, ChevronUp, Settings2, Trophy, Award 
 } from 'lucide-react';
 import { WorkoutCalendar } from './WorkoutCalendar';
 
@@ -58,6 +58,167 @@ export function Progress({ profile, updateProfile, history, measurements, addMea
 
     return message;
   }, [history, measurements, profile]);
+
+  // Total Lifetime Volume
+  const totalLifetimeVolume = useMemo(() => {
+    let total = 0;
+    history?.forEach(workout => {
+      workout.exercises?.forEach(ex => {
+        ex.sets?.forEach(set => {
+          total += (parseFloat(set.weight) * parseInt(set.reps) || 0);
+        });
+      });
+    });
+    return Math.round(total);
+  }, [history]);
+
+  // Personal Records for big lifts
+  const prs = useMemo(() => {
+    const maxWeights = { bench: 0, squat: 0, deadlift: 0, ohp: 0 };
+    history?.forEach(workout => {
+      workout.exercises?.forEach(ex => {
+        const name = ex.name?.toLowerCase() || '';
+        let key = '';
+        if (name.includes('bench press')) key = 'bench';
+        else if (name.includes('squat')) key = 'squat';
+        else if (name.includes('deadlift')) key = 'deadlift';
+        else if (name.includes('overhead press') || name.includes('ohp')) key = 'ohp';
+        
+        if (key) {
+          ex.sets?.forEach(set => {
+            const w = parseFloat(set.weight) || 0;
+            if (w > maxWeights[key]) {
+              maxWeights[key] = w;
+            }
+          });
+        }
+      });
+    });
+    return maxWeights;
+  }, [history]);
+
+  // Volume Comparison selector
+  const volumeComparison = useMemo(() => {
+    const vol = totalLifetimeVolume;
+    if (vol === 0) return { text: "No weight lifted yet. Start your training to log volume!", emoji: "🌱", nextMilestone: 500, object: "" };
+    if (vol < 500) return { text: `You've lifted ${vol.toLocaleString()} ${profile?.units || 'kg'} total—that's a giant tortoise! 🐢`, emoji: "🐢", nextMilestone: 500, object: "Giant Tortoise" };
+    if (vol < 1000) return { text: `You've lifted ${vol.toLocaleString()} ${profile?.units || 'kg'} total—that's a Baby Grand Piano! 🎹`, emoji: "🎹", nextMilestone: 1000, object: "Grand Piano" };
+    if (vol < 3000) return { text: `You've lifted ${vol.toLocaleString()} ${profile?.units || 'kg'} total—that's a Smart Car! 🚗`, emoji: "🚗", nextMilestone: 3000, object: "Smart Car" };
+    if (vol < 6000) return { text: `You've lifted ${vol.toLocaleString()} ${profile?.units || 'kg'} total—that's a full-grown Hippopotamus! 🦛`, emoji: "🦛", nextMilestone: 6000, object: "Hippo" };
+    if (vol < 12000) return { text: `You've lifted ${vol.toLocaleString()} ${profile?.units || 'kg'} total—that's a massive Orca Whale! 🐳`, emoji: "🐳", nextMilestone: 12000, object: "Orca Whale" };
+    if (vol < 45000) return { text: `You've lifted ${vol.toLocaleString()} ${profile?.units || 'kg'} total—that's a Double-Decker Bus! 🚌`, emoji: "🚌", nextMilestone: 45000, object: "Double-Decker Bus" };
+    if (vol < 150000) return { text: `You've lifted ${vol.toLocaleString()} ${profile?.units || 'kg'} total—that's a whole Boeing 737 Airplane! ✈️`, emoji: "✈️", nextMilestone: 150000, object: "Boeing 737" };
+    return { text: `You've lifted ${vol.toLocaleString()} ${profile?.units || 'kg'} total—that's equivalent to a giant Blue Whale! 🐋`, emoji: "🐋", nextMilestone: null, object: "Blue Whale" };
+  }, [totalLifetimeVolume, profile?.units]);
+
+  // PR Animal Comparisons
+  const prComparisons = useMemo(() => {
+    const getDeadliftAnimal = (w) => {
+      if (w === 0) return { name: "No lift logged", emoji: "🔒" };
+      if (w < 50) return { name: "Giant Panda 🐼", emoji: "🐼" };
+      if (w < 100) return { name: "Kangaroo 🦘", emoji: "🦘" };
+      if (w < 150) return { name: "Newborn Baby Elephant! 🐘", emoji: "🐘" };
+      if (w < 200) return { name: "Lion 🦁", emoji: "🦁" };
+      return { name: "Grizzly Bear! 🐻", emoji: "🐻" };
+    };
+
+    const getBenchAnimal = (w) => {
+      if (w === 0) return { name: "No lift logged", emoji: "🔒" };
+      if (w < 40) return { name: "Golden Retriever 🦮", emoji: "🦮" };
+      if (w < 80) return { name: "Adult Cheetah 🐆", emoji: "🐆" };
+      if (w < 120) return { name: "Silverback Gorilla 🦍", emoji: "🦍" };
+      return { name: "Wild Boar! 🐗", emoji: "🐗" };
+    };
+
+    const getSquatAnimal = (w) => {
+      if (w === 0) return { name: "No lift logged", emoji: "🔒" };
+      if (w < 60) return { name: "Giant Sea Turtle 🐢", emoji: "🐢" };
+      if (w < 120) return { name: "Reindeer 🦌", emoji: "🦌" };
+      if (w < 180) return { name: "Bengal Tiger 🐅", emoji: "🐅" };
+      return { name: "American Alligator! 🐊", emoji: "🐊" };
+    };
+
+    return {
+      deadlift: getDeadliftAnimal(prs.deadlift),
+      bench: getBenchAnimal(prs.bench),
+      squat: getSquatAnimal(prs.squat)
+    };
+  }, [prs]);
+
+  // Trophy Room Badges
+  const badges = useMemo(() => {
+    const list = [
+      {
+        id: 'initiate',
+        name: 'Iron Initiate',
+        desc: 'Lift 1,000 kg total volume',
+        unlocked: totalLifetimeVolume >= 1000,
+        icon: '🛡️',
+        color: 'from-slate-500/20 to-slate-500/5 text-slate-400 border-slate-500/30'
+      },
+      {
+        id: 'warrior',
+        name: 'Iron Warrior',
+        desc: 'Lift 50,000 kg total volume',
+        unlocked: totalLifetimeVolume >= 50000,
+        icon: '⚔️',
+        color: 'from-red-500/20 to-red-500/5 text-red-400 border-red-500/30'
+      },
+      {
+        id: 'hero',
+        name: 'Habit Hero',
+        desc: 'Complete at least 5 workouts',
+        unlocked: history?.filter(w => w.routine_name !== 'Rest Day').length >= 5,
+        icon: '🔥',
+        color: 'from-orange-500/20 to-orange-500/5 text-orange-400 border-orange-500/30'
+      },
+      {
+        id: 'titan',
+        name: 'Consistent Titan',
+        desc: 'Complete at least 20 workouts',
+        unlocked: history?.filter(w => w.routine_name !== 'Rest Day').length >= 20,
+        icon: '👑',
+        color: 'from-yellow-500/20 to-yellow-500/5 text-yellow-400 border-yellow-500/30'
+      },
+      {
+        id: 'early',
+        name: 'Early Riser',
+        desc: 'Log a workout before 8:00 AM',
+        unlocked: history?.some(w => {
+          if (w.routine_name === 'Rest Day') return false;
+          const timePart = w.date.split('T')[1];
+          if (!timePart) return false;
+          const hour = parseInt(timePart.split(':')[0]);
+          return hour < 8;
+        }),
+        icon: '🌅',
+        color: 'from-cyan-500/20 to-cyan-500/5 text-cyan-400 border-cyan-500/30'
+      },
+      {
+        id: 'night',
+        name: 'Night Owl',
+        desc: 'Log a workout after 8:00 PM',
+        unlocked: history?.some(w => {
+          if (w.routine_name === 'Rest Day') return false;
+          const timePart = w.date.split('T')[1];
+          if (!timePart) return false;
+          const hour = parseInt(timePart.split(':')[0]);
+          return hour >= 20;
+        }),
+        icon: '🦉',
+        color: 'from-indigo-500/20 to-indigo-500/5 text-indigo-400 border-indigo-500/30'
+      },
+      {
+        id: 'rest',
+        name: 'Recover Pro',
+        desc: 'Log a dedicated rest day',
+        unlocked: history?.some(w => w.routine_name === 'Rest Day'),
+        icon: '☕',
+        color: 'from-amber-500/20 to-amber-500/5 text-amber-500 border-amber-500/30'
+      }
+    ];
+    return list;
+  }, [history, totalLifetimeVolume]);
 
   const handleAddMeasurementType = async (e) => {
     e.preventDefault();
@@ -141,6 +302,112 @@ export function Progress({ profile, updateProfile, history, measurements, addMea
           Workout Calendar
         </h2>
         <WorkoutCalendar history={history} />
+      </section>
+
+      {/* Trophy Room & Milestones Section */}
+      <section className="space-y-6">
+        <h2 className="text-xl font-bold flex items-center gap-2">
+          <Trophy className="w-5 h-5 text-yellow-500" />
+          Trophy Room & Milestones
+        </h2>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Lifetime Weight Card */}
+          <div className="bg-card border border-border p-6 rounded-3xl space-y-4 flex flex-col justify-between shadow-sm relative overflow-hidden group">
+            <div className="space-y-2">
+              <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Lifetime Volume</span>
+              <p className="text-4xl font-black text-primary">
+                {totalLifetimeVolume.toLocaleString()} <span className="text-sm font-normal text-muted-foreground uppercase">{profile?.units || 'kg'}</span>
+              </p>
+              <div className="bg-secondary/40 border border-border/60 p-4 rounded-2xl flex items-center gap-4 mt-2">
+                <span className="text-3xl select-none">{volumeComparison.emoji}</span>
+                <div>
+                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Comparison</p>
+                  <p className="text-sm font-black text-foreground mt-0.5">{volumeComparison.text}</p>
+                </div>
+              </div>
+            </div>
+            
+            {volumeComparison.nextMilestone && (
+              <div className="space-y-1.5 pt-2">
+                <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                  <span>Progress to next milestone</span>
+                  <span>{Math.min(Math.round((totalLifetimeVolume / volumeComparison.nextMilestone) * 100), 100)}%</span>
+                </div>
+                <div className="h-1.5 w-full bg-secondary rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-primary rounded-full transition-all duration-1000"
+                    style={{ width: `${Math.min((totalLifetimeVolume / volumeComparison.nextMilestone) * 100, 100)}%` }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* PR Animal Lifting Card */}
+          <div className="bg-card border border-border p-6 rounded-3xl space-y-4 shadow-sm">
+            <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">What Can You Lift?</span>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between bg-secondary/30 p-3 rounded-2xl border border-border/40">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">{prComparisons.bench.emoji}</span>
+                  <div>
+                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Bench Press PR ({prs.bench} {profile?.units})</p>
+                    <p className="text-sm font-black text-foreground">{prComparisons.bench.name}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between bg-secondary/30 p-3 rounded-2xl border border-border/40">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">{prComparisons.squat.emoji}</span>
+                  <div>
+                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Squat PR ({prs.squat} {profile?.units})</p>
+                    <p className="text-sm font-black text-foreground">{prComparisons.squat.name}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between bg-secondary/30 p-3 rounded-2xl border border-border/40">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">{prComparisons.deadlift.emoji}</span>
+                  <div>
+                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Deadlift PR ({prs.deadlift} {profile?.units})</p>
+                    <p className="text-sm font-black text-foreground">{prComparisons.deadlift.name}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Badges Grid */}
+        <div className="bg-card border border-border p-6 rounded-3xl space-y-4 shadow-sm">
+          <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+            <Award className="w-4 h-4 text-primary" />
+            Earned Badges
+          </span>
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+            {badges.map((b) => (
+              <div 
+                key={b.id}
+                className={`border p-4 rounded-2xl flex flex-col items-center text-center justify-between gap-2 transition-all relative group ${
+                  b.unlocked 
+                    ? `bg-gradient-to-b ${b.color} hover:scale-105 shadow-md` 
+                    : 'bg-card/50 border-border/40 opacity-40'
+                }`}
+              >
+                <div className={`text-3xl select-none ${b.unlocked ? 'animate-bounce' : 'grayscale filter'}`}>
+                  {b.unlocked ? b.icon : '🔒'}
+                </div>
+                <div className="space-y-0.5">
+                  <p className="text-[10px] font-black uppercase tracking-tight line-clamp-1">{b.name}</p>
+                  <p className="text-[8px] text-muted-foreground font-medium leading-none line-clamp-2">{b.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </section>
 
       {/* Measurements Section */}
