@@ -187,6 +187,7 @@ export function Dashboard({ profile, history, deleteHistory, addHistory }) {
 
   const [selectedExercise, setSelectedExercise] = useState('');
   const [selectedMetric, setSelectedMetric] = useState('maxWeight');
+  const [muscleView, setMuscleView] = useState('heatmap'); // 'heatmap' or 'chart'
 
   // Set default selected exercise once the list loads
   useEffect(() => {
@@ -547,15 +548,38 @@ export function Dashboard({ profile, history, deleteHistory, addHistory }) {
 
         {/* Muscle Split Heatmap */}
         <div className="bg-card border border-border p-6 rounded-3xl space-y-6 shadow-sm">
-          <h2 className="text-sm font-black uppercase tracking-[0.2em] text-muted-foreground flex items-center gap-2">
-            <PieIcon className="w-4 h-4 text-primary" />
-            Muscle Focus Split
-          </h2>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <h2 className="text-sm font-black uppercase tracking-[0.2em] text-muted-foreground flex items-center gap-2">
+              <PieIcon className="w-4 h-4 text-primary" />
+              Muscle Focus Split
+            </h2>
+            {stats && stats.muscleData.length > 0 && (
+              <div className="flex gap-1 p-1 bg-secondary/50 rounded-xl self-start sm:self-center">
+                <button
+                  onClick={() => setMuscleView('heatmap')}
+                  className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase transition-all ${
+                    muscleView === 'heatmap' ? 'bg-primary text-white shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Blueprint 👤
+                </button>
+                <button
+                  onClick={() => setMuscleView('chart')}
+                  className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase transition-all ${
+                    muscleView === 'chart' ? 'bg-primary text-white shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Pie Chart 📊
+                </button>
+              </div>
+            )}
+          </div>
+
           {stats && stats.muscleData.length > 0 ? (
-            <div className="flex flex-col xl:flex-row items-center justify-center gap-8">
-              <MuscleHeatmap muscleData={stats.muscleData} />
-              
-              <div className="flex-1 w-full flex flex-col sm:flex-row items-center gap-6">
+            <div className="flex flex-col md:flex-row items-center justify-center gap-8">
+              {muscleView === 'heatmap' ? (
+                <MuscleHeatmap muscleData={stats.muscleData} />
+              ) : (
                 <div className="h-48 w-48 shrink-0 mx-auto">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
@@ -574,25 +598,26 @@ export function Dashboard({ profile, history, deleteHistory, addHistory }) {
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
-                <div className="flex-1 w-full space-y-3">
-                  {stats.muscleData.map((m) => (
-                    <div key={m.name} className="space-y-1">
-                      <div className="flex justify-between text-xs font-bold uppercase tracking-wider">
-                        <span className="capitalize">{m.name}</span>
-                        <span className="text-muted-foreground">{m.percentage}%</span>
-                      </div>
-                      <div className="h-1.5 w-full bg-secondary rounded-full overflow-hidden">
-                        <div 
-                          className="h-full rounded-full transition-all duration-1000" 
-                          style={{ 
-                            width: `${m.percentage}%`, 
-                            backgroundColor: MUSCLE_COLORS[m.name] || MUSCLE_COLORS['other'] 
-                          }} 
-                        />
-                      </div>
+              )}
+              
+              <div className="flex-1 w-full space-y-3">
+                {stats.muscleData.map((m) => (
+                  <div key={m.name} className="space-y-1">
+                    <div className="flex justify-between text-xs font-bold uppercase tracking-wider">
+                      <span className="capitalize">{m.name}</span>
+                      <span className="text-muted-foreground">{m.percentage}%</span>
                     </div>
-                  ))}
-                </div>
+                    <div className="h-1.5 w-full bg-secondary rounded-full overflow-hidden">
+                      <div 
+                        className="h-full rounded-full transition-all duration-1000" 
+                        style={{ 
+                          width: `${m.percentage}%`, 
+                          backgroundColor: MUSCLE_COLORS[m.name] || MUSCLE_COLORS['other'] 
+                        }} 
+                      />
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           ) : (
