@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight, Dumbbell } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Dumbbell, Coffee } from 'lucide-react';
 
 export function WorkoutCalendar({ history }) {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -58,19 +58,36 @@ export function WorkoutCalendar({ history }) {
           const workouts = workoutDays[dateStr];
           const isToday = new Date().toISOString().split('T')[0] === dateStr;
 
+          const hasWorkout = workouts && workouts.some(w => w.routine_name !== 'Rest Day');
+          const hasRest = workouts && !hasWorkout && workouts.some(w => w.routine_name === 'Rest Day');
+
+          let bgClass = 'hover:bg-secondary';
+          let textClass = 'font-medium';
+          let dotColor = 'bg-primary';
+
+          if (hasWorkout) {
+            bgClass = 'bg-primary/10 text-primary';
+            textClass = 'font-bold';
+            dotColor = 'bg-primary';
+          } else if (hasRest) {
+            bgClass = 'bg-amber-500/10 text-amber-500';
+            textClass = 'font-bold';
+            dotColor = 'bg-amber-500';
+          }
+
           return (
             <button
               key={day}
               onClick={() => setSelectedDate(workouts ? dateStr : null)}
-              className={`relative p-2 h-10 w-full rounded-xl text-sm font-medium transition-all flex items-center justify-center
-                ${workouts ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-secondary'}
+              className={`relative p-2 h-10 w-full rounded-xl text-sm transition-all flex items-center justify-center
+                ${bgClass} ${textClass}
                 ${isToday ? 'border border-primary' : ''}
                 ${selectedDate === dateStr ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : ''}
               `}
             >
               {day}
               {workouts && (
-                <div className="absolute bottom-1 w-1 h-1 bg-primary rounded-full"></div>
+                <div className={`absolute bottom-1 w-1 h-1 ${dotColor} rounded-full`}></div>
               )}
             </button>
           );
@@ -80,17 +97,31 @@ export function WorkoutCalendar({ history }) {
       {selectedDate && workoutDays[selectedDate] && (
         <div className="space-y-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
           <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
-            Workouts on {new Date(selectedDate).toLocaleDateString()}
+            Activity on {new Date(selectedDate).toLocaleDateString()}
           </h4>
-          {workoutDays[selectedDate].map(workout => (
-            <div key={workout.id} className="bg-secondary/50 p-4 rounded-2xl flex justify-between items-center">
-              <div>
-                <p className="font-bold">{workout.routine_name}</p>
-                <p className="text-xs text-muted-foreground">{workout.exercises?.length} Exercises • {workout.duration} min</p>
+          {workoutDays[selectedDate].map(workout => {
+            const isRest = workout.routine_name === 'Rest Day';
+            return (
+              <div key={workout.id} className="bg-secondary/50 p-4 rounded-2xl flex justify-between items-center border border-border/50">
+                <div>
+                  <p className="font-bold flex items-center gap-2">
+                    {workout.routine_name}
+                    {isRest && <span className="text-sm">☕</span>}
+                  </p>
+                  {!isRest ? (
+                    <p className="text-xs text-muted-foreground">{workout.exercises?.length || 0} Exercises • {workout.duration || 0} min</p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">Rest & recovery day</p>
+                  )}
+                </div>
+                {isRest ? (
+                  <Coffee className="w-5 h-5 text-amber-500" />
+                ) : (
+                  <Dumbbell className="w-5 h-5 text-primary" />
+                )}
               </div>
-              <Dumbbell className="w-5 h-5 text-primary" />
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

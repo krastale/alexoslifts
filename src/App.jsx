@@ -68,7 +68,7 @@ function AppContent() {
 
     switch (activeTab) {
       case 'dashboard':
-        return <Dashboard profile={profile} history={history} deleteHistory={deleteHistory} />;
+        return <Dashboard profile={profile} history={history} deleteHistory={deleteHistory} addHistory={addHistory} />;
       case 'routines':
         return <RoutineBuilder routines={routines} addRoutine={addRoutine} updateRoutine={updateRoutine} deleteRoutine={deleteRoutine} />;
       case 'progress':
@@ -90,7 +90,7 @@ function AppContent() {
       case 'settings':
         return <Settings profile={profile} updateProfile={updateProfile} />;
       default:
-        return <Dashboard profile={profile} history={history} />;
+        return <Dashboard profile={profile} history={history} deleteHistory={deleteHistory} addHistory={addHistory} />;
     }
   };
 
