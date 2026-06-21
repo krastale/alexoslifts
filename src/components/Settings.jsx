@@ -1,13 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { LogOut, User, Info, Loader2, Check, X, Weight, Lock } from 'lucide-react';
+import { LogOut, User, Info, Loader2, Check, X, Lock } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 
 export function Settings({ profile, updateProfile }) {
   const { signOut, updatePassword, isRecoveryMode, setIsRecoveryMode } = useAuth();
   const [isUpdating, setIsUpdating] = useState(false);
   const [newUsername, setNewUsername] = useState(profile?.username || '');
-  const [newWeight, setNewWeight] = useState(profile?.weight || '');
   const [usernameStatus, setUsernameStatus] = useState(null); // 'available', 'taken', 'checking', 'invalid'
   const [usernameError, setUsernameError] = useState('');
 
@@ -20,7 +19,6 @@ export function Settings({ profile, updateProfile }) {
 
   useEffect(() => {
     setNewUsername(profile?.username || '');
-    setNewWeight(profile?.weight || '');
   }, [profile]);
 
   useEffect(() => {
@@ -74,8 +72,7 @@ export function Settings({ profile, updateProfile }) {
 
     setIsUpdating(true);
     await updateProfile({ 
-      username: newUsername.toLowerCase(), 
-      weight: parseFloat(newWeight) 
+      username: newUsername.toLowerCase()
     });
     setIsUpdating(false);
     alert('Profile Updated!');
@@ -148,20 +145,7 @@ export function Settings({ profile, updateProfile }) {
               )}
             </div>
 
-            <div>
-              <label className="block text-xs font-black uppercase tracking-widest text-muted-foreground mb-2">Body Weight ({profile?.units})</label>
-              <div className="relative">
-                <Weight className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <input
-                  type="number"
-                  step="0.1"
-                  className="w-full bg-secondary border-2 border-transparent focus:border-primary rounded-2xl py-3.5 pl-11 pr-4 outline-none transition-all font-bold"
-                  value={newWeight}
-                  onChange={(e) => setNewWeight(e.target.value)}
-                  placeholder="0.0"
-                />
-              </div>
-            </div>
+
           </div>
 
           <button
