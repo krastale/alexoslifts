@@ -63,10 +63,12 @@ export function WorkoutCalendar({ history }) {
             const name = (w.routine_name || w.routineName || '').trim().toLowerCase();
             return name !== 'rest day';
           });
-          const hasRest = workouts && !hasWorkout && workouts.some(w => {
+          const todayStr = new Date().toISOString().split('T')[0];
+          const isPastOrToday = dateStr <= todayStr;
+          const hasRest = (workouts && workouts.some(w => {
             const name = (w.routine_name || w.routineName || '').trim().toLowerCase();
             return name === 'rest day';
-          });
+          })) || (!hasWorkout && isPastOrToday);
 
           let bgClass = 'hover:bg-secondary';
           let textClass = 'font-medium';
@@ -85,7 +87,7 @@ export function WorkoutCalendar({ history }) {
           return (
             <button
               key={day}
-              onClick={() => setSelectedDate(workouts ? dateStr : null)}
+              onClick={() => setSelectedDate(dateStr)}
               className={`relative p-2 h-10 w-full rounded-xl text-sm transition-all flex items-center justify-center
                 ${bgClass} ${textClass}
                 ${isToday ? 'border border-primary' : ''}
@@ -93,7 +95,7 @@ export function WorkoutCalendar({ history }) {
               `}
             >
               {day}
-              {workouts && (
+              {workouts && workouts.length > 0 && (
                 <div className={`absolute bottom-1 w-1 h-1 ${dotColor} rounded-full`}></div>
               )}
             </button>
@@ -101,34 +103,59 @@ export function WorkoutCalendar({ history }) {
         })}
       </div>
 
-      {selectedDate && workoutDays[selectedDate] && (
+      {selectedDate && (
         <div className="space-y-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
           <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
             Activity on {new Date(selectedDate).toLocaleDateString()}
           </h4>
-          {workoutDays[selectedDate].map(workout => {
-            const isRest = (workout.routine_name || workout.routineName || '').trim().toLowerCase() === 'rest day';
-            return (
-              <div key={workout.id} className="bg-secondary/50 p-4 rounded-2xl flex justify-between items-center border border-border/50">
-                <div>
-                  <p className="font-bold flex items-center gap-2">
-                    {workout.routine_name || workout.routineName}
-                    {isRest && <span className="text-sm">☕</span>}
-                  </p>
-                  {!isRest ? (
-                    <p className="text-xs text-muted-foreground">{workout.exercises?.length || 0} Exercises • {workout.duration || 0} min</p>
+          {workoutDays[selectedDate] && workoutDays[selectedDate].length > 0 ? (
+            workoutDays[selectedDate].map(workout => {
+              const isRest = (workout.routine_name || workout.routineName || '').trim().toLowerCase() === 'rest day';
+              return (
+                <div key={workout.id} className="bg-secondary/50 p-4 rounded-2xl flex justify-between items-center border border-border/50">
+                  <div>
+                    <p className="font-bold flex items-center gap-2">
+                      {workout.routine_name || workout.routineName}
+                      {isRest && <span className="text-sm">☕</span>}
+                    </p>
+                    {!isRest ? (
+                      <p className="text-xs text-muted-foreground">{workout.exercises?.length || 0} Exercises • {workout.duration || 0} min</p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">Rest & recovery day</p>
+                    )}
+                  </div>
+                  {isRest ? (
+                    <Coffee className="w-5 h-5 text-amber-500" />
                   ) : (
-                    <p className="text-xs text-muted-foreground">Rest & recovery day</p>
+                    <Dumbbell className="w-5 h-5 text-primary" />
                   )}
                 </div>
-                {isRest ? (
-                  <Coffee className="w-5 h-5 text-amber-500" />
-                ) : (
-                  <Dumbbell className="w-5 h-5 text-primary" />
-                )}
+              );
+            })
+          ) : (
+            <div className="bg-secondary/50 p-4 rounded-2xl flex justify-between items-center border border-border/50">
+              <div>
+                <p className="font-bold flex items-center gap-2">
+                  {selectedDate <= new Date().toISOString().split('T')[0] ? (
+                    <>Rest Day <span className="text-sm">☕</span></>
+                  ) : (
+                    <>No Activity Scheduled</>
+                  )}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {selectedDate <= new Date().toISOString().split('T')[0] 
+                    ? 'Auto-generated rest & recovery day' 
+                    : 'Plan your next workout in the Routine Builder'
+                  }
+                </p>
               </div>
-            );
-          })}
+              {selectedDate <= new Date().toISOString().split('T')[0] ? (
+                <Coffee className="w-5 h-5 text-amber-500" />
+              ) : (
+                <Dumbbell className="w-5 h-5 text-muted-foreground/30" />
+              )}
+            </div>
+          )}
         </div>
       )}
 
