@@ -21,7 +21,8 @@ export function WorkoutCalendar({ history }) {
   const firstDay = firstDayOfMonth(year, month);
 
   const workoutDays = history.reduce((acc, workout) => {
-    const date = new Date(workout.date).toISOString().split('T')[0];
+    if (!workout.date) return acc;
+    const date = workout.date.split('T')[0];
     if (!acc[date]) acc[date] = [];
     acc[date].push(workout);
     return acc;
@@ -58,8 +59,14 @@ export function WorkoutCalendar({ history }) {
           const workouts = workoutDays[dateStr];
           const isToday = new Date().toISOString().split('T')[0] === dateStr;
 
-          const hasWorkout = workouts && workouts.some(w => w.routine_name !== 'Rest Day');
-          const hasRest = workouts && !hasWorkout && workouts.some(w => w.routine_name === 'Rest Day');
+          const hasWorkout = workouts && workouts.some(w => {
+            const name = (w.routine_name || w.routineName || '').trim().toLowerCase();
+            return name !== 'rest day';
+          });
+          const hasRest = workouts && !hasWorkout && workouts.some(w => {
+            const name = (w.routine_name || w.routineName || '').trim().toLowerCase();
+            return name === 'rest day';
+          });
 
           let bgClass = 'hover:bg-secondary';
           let textClass = 'font-medium';
@@ -100,12 +107,12 @@ export function WorkoutCalendar({ history }) {
             Activity on {new Date(selectedDate).toLocaleDateString()}
           </h4>
           {workoutDays[selectedDate].map(workout => {
-            const isRest = workout.routine_name === 'Rest Day';
+            const isRest = (workout.routine_name || workout.routineName || '').trim().toLowerCase() === 'rest day';
             return (
               <div key={workout.id} className="bg-secondary/50 p-4 rounded-2xl flex justify-between items-center border border-border/50">
                 <div>
                   <p className="font-bold flex items-center gap-2">
-                    {workout.routine_name}
+                    {workout.routine_name || workout.routineName}
                     {isRest && <span className="text-sm">☕</span>}
                   </p>
                   {!isRest ? (

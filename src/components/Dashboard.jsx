@@ -199,12 +199,12 @@ export function Dashboard({ profile, history, deleteHistory, addHistory }) {
   // Rest Day Toggle handler
   const todayStr = new Date().toISOString().split('T')[0];
   const todayHasRestDay = useMemo(() => {
-    return history?.some(w => w.date.split('T')[0] === todayStr && w.routine_name === 'Rest Day');
+    return history?.some(w => w.date.split('T')[0] === todayStr && (w.routine_name || w.routineName || '').trim().toLowerCase() === 'rest day');
   }, [history, todayStr]);
 
   const handleToggleRestDay = async () => {
     if (todayHasRestDay) {
-      const restDayEntry = history.find(w => w.date.split('T')[0] === todayStr && w.routine_name === 'Rest Day');
+      const restDayEntry = history.find(w => w.date.split('T')[0] === todayStr && (w.routine_name || w.routineName || '').trim().toLowerCase() === 'rest day');
       if (restDayEntry) {
         await deleteHistory(restDayEntry.id);
       }
@@ -243,7 +243,7 @@ export function Dashboard({ profile, history, deleteHistory, addHistory }) {
     // Streak logic with 7-day rest window
     let streak = 0;
     const workouts = history.filter(w => 
-      w.routine_name !== 'Rest Day' && 
+      (w.routine_name || w.routineName || '').trim().toLowerCase() !== 'rest day' && 
       w.exercises && 
       w.exercises.length > 0
     );
@@ -271,7 +271,7 @@ export function Dashboard({ profile, history, deleteHistory, addHistory }) {
           const d2 = uniqueWorkoutDates[i];
           const d1 = uniqueWorkoutDates[i - 1];
           const gap = getDaysDiff(d2, d1) - 1;
-          if (gap > 7) {
+          if (gap >= 7) {
             streakStart = d2;
             break;
           } else {
@@ -412,7 +412,7 @@ export function Dashboard({ profile, history, deleteHistory, addHistory }) {
             <Trophy className="w-5 h-5" />
           </div>
           <div>
-            <p className="text-2xl font-black">{filteredHistory.filter(w => w.routine_name !== 'Rest Day').length}</p>
+            <p className="text-2xl font-black">{filteredHistory.filter(w => (w.routine_name || w.routineName || '').trim().toLowerCase() !== 'rest day').length}</p>
             <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Workouts</p>
           </div>
         </div>
@@ -634,7 +634,7 @@ export function Dashboard({ profile, history, deleteHistory, addHistory }) {
         <div className="space-y-3">
           {filteredHistory.length > 0 ? (
             filteredHistory.slice(0, 5).map((workout) => {
-              const isRest = workout.routine_name === 'Rest Day';
+              const isRest = (workout.routine_name || workout.routineName || '').trim().toLowerCase() === 'rest day';
               return (
                 <div key={workout.id} className={`bg-card border p-5 rounded-3xl flex justify-between items-center group transition-all relative ${
                   isRest ? 'border-border/50 hover:border-amber-500/30' : 'border-border hover:border-primary/50'
@@ -653,7 +653,7 @@ export function Dashboard({ profile, history, deleteHistory, addHistory }) {
                     </div>
                     <div>
                       <p className="font-black uppercase tracking-tight">
-                        {workout.routine_name}
+                        {workout.routine_name || workout.routineName}
                         {isRest && <span className="text-sm ml-1.5">☕</span>}
                       </p>
                       <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-2">

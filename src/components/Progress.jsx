@@ -168,7 +168,7 @@ export function Progress({ profile, updateProfile, history, measurements, addMea
         id: 'hero',
         name: 'Habit Hero',
         desc: 'Complete at least 5 workouts',
-        unlocked: history?.filter(w => w.routine_name !== 'Rest Day').length >= 5,
+        unlocked: history?.filter(w => (w.routine_name || w.routineName || '').trim().toLowerCase() !== 'rest day').length >= 5,
         icon: '🔥',
         color: 'from-orange-500/20 to-orange-500/5 text-orange-400 border-orange-500/30'
       },
@@ -176,7 +176,7 @@ export function Progress({ profile, updateProfile, history, measurements, addMea
         id: 'titan',
         name: 'Consistent Titan',
         desc: 'Complete at least 20 workouts',
-        unlocked: history?.filter(w => w.routine_name !== 'Rest Day').length >= 20,
+        unlocked: history?.filter(w => (w.routine_name || w.routineName || '').trim().toLowerCase() !== 'rest day').length >= 20,
         icon: '👑',
         color: 'from-yellow-500/20 to-yellow-500/5 text-yellow-400 border-yellow-500/30'
       },
@@ -185,7 +185,7 @@ export function Progress({ profile, updateProfile, history, measurements, addMea
         name: 'Early Riser',
         desc: 'Log a workout before 8:00 AM',
         unlocked: history?.some(w => {
-          if (w.routine_name === 'Rest Day') return false;
+          if ((w.routine_name || w.routineName || '').trim().toLowerCase() === 'rest day') return false;
           const timePart = w.date.split('T')[1];
           if (!timePart) return false;
           const hour = parseInt(timePart.split(':')[0]);
@@ -199,7 +199,7 @@ export function Progress({ profile, updateProfile, history, measurements, addMea
         name: 'Night Owl',
         desc: 'Log a workout after 8:00 PM',
         unlocked: history?.some(w => {
-          if (w.routine_name === 'Rest Day') return false;
+          if ((w.routine_name || w.routineName || '').trim().toLowerCase() === 'rest day') return false;
           const timePart = w.date.split('T')[1];
           if (!timePart) return false;
           const hour = parseInt(timePart.split(':')[0]);
@@ -212,7 +212,7 @@ export function Progress({ profile, updateProfile, history, measurements, addMea
         id: 'rest',
         name: 'Recover Pro',
         desc: 'Log a dedicated rest day',
-        unlocked: history?.some(w => w.routine_name === 'Rest Day'),
+        unlocked: history?.some(w => (w.routine_name || w.routineName || '').trim().toLowerCase() === 'rest day'),
         icon: '☕',
         color: 'from-amber-500/20 to-amber-500/5 text-amber-500 border-amber-500/30'
       }
