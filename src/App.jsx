@@ -101,6 +101,7 @@ function AppContent() {
         <div className={`fixed inset-0 z-[100] bg-background ${isWorkoutMinimized ? 'hidden' : ''}`}>
           <WorkoutLogger 
             routine={activeWorkout} 
+            profile={profile}
             history={history}
             onSave={async (workout) => {
               await addHistory(workout);

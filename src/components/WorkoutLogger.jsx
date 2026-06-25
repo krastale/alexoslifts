@@ -6,13 +6,14 @@ import confetti from 'canvas-confetti';
 
 import { EXERCISE_CATEGORIES } from './RoutineBuilder';
 
-function PlateCalculator({ weight, onClose }) {
-  const [barWeight, setBarWeight] = useState(20);
+function PlateCalculator({ weight, onClose, units = 'kg' }) {
+  const isLbs = units === 'lbs';
+  const [barWeight, setBarWeight] = useState(isLbs ? 45 : 20);
   const [isCustomBar, setIsCustomBar] = useState(false);
   const [customBarWeight, setCustomBarWeight] = useState('');
 
   const targetSide = Math.max(0, (weight - barWeight) / 2);
-  const availablePlates = [20, 15, 10, 5, 2.5, 1.25];
+  const availablePlates = isLbs ? [45, 35, 25, 10, 5, 2.5] : [20, 15, 10, 5, 2.5, 1.25];
   
   let remaining = targetSide;
   const platesNeeded = [];
@@ -25,25 +26,50 @@ function PlateCalculator({ weight, onClose }) {
   });
 
   const getPlateStyle = (plate) => {
-    switch (plate) {
-      case 20:
-        return { height: 'h-28', width: 'w-4', bg: 'bg-blue-500 border-blue-700', textColor: 'text-blue-100', label: '20' };
-      case 15:
-        return { height: 'h-24', width: 'w-3.5', bg: 'bg-yellow-500 border-yellow-700', textColor: 'text-yellow-950', label: '15' };
-      case 10:
-        return { height: 'h-22', width: 'w-3.5', bg: 'bg-green-600 border-green-800', textColor: 'text-green-100', label: '10' };
-      case 5:
-        return { height: 'h-18', width: 'w-3', bg: 'bg-zinc-200 border-zinc-400', textColor: 'text-zinc-800', label: '5' };
-      case 2.5:
-        return { height: 'h-14', width: 'w-3', bg: 'bg-zinc-800 border-zinc-950', textColor: 'text-zinc-300', label: '2.5' };
-      case 1.25:
-        return { height: 'h-10', width: 'w-2.5', bg: 'bg-zinc-400 border-zinc-500', textColor: 'text-zinc-900', label: '1.2' };
-      default:
-        return { height: 'h-10', width: 'w-2', bg: 'bg-zinc-500 border-zinc-600', textColor: 'text-white', label: '' };
+    if (isLbs) {
+      switch (plate) {
+        case 45:
+          return { height: 'h-28', width: 'w-4', bg: 'bg-red-500 border-red-700', textColor: 'text-red-100', label: '45' };
+        case 35:
+          return { height: 'h-26', width: 'w-3.5', bg: 'bg-blue-500 border-blue-700', textColor: 'text-blue-100', label: '35' };
+        case 25:
+          return { height: 'h-24', width: 'w-3.5', bg: 'bg-yellow-500 border-yellow-700', textColor: 'text-yellow-950', label: '25' };
+        case 10:
+          return { height: 'h-20', width: 'w-3', bg: 'bg-green-600 border-green-800', textColor: 'text-green-100', label: '10' };
+        case 5:
+          return { height: 'h-16', width: 'w-2.5', bg: 'bg-zinc-200 border-zinc-400', textColor: 'text-zinc-800', label: '5' };
+        case 2.5:
+          return { height: 'h-12', width: 'w-2.5', bg: 'bg-zinc-800 border-zinc-950', textColor: 'text-zinc-300', label: '2.5' };
+        default:
+          return { height: 'h-10', width: 'w-2', bg: 'bg-zinc-500 border-zinc-600', textColor: 'text-white', label: '' };
+      }
+    } else {
+      switch (plate) {
+        case 20:
+          return { height: 'h-28', width: 'w-4', bg: 'bg-blue-500 border-blue-700', textColor: 'text-blue-100', label: '20' };
+        case 15:
+          return { height: 'h-24', width: 'w-3.5', bg: 'bg-yellow-500 border-yellow-700', textColor: 'text-yellow-950', label: '15' };
+        case 10:
+          return { height: 'h-22', width: 'w-3.5', bg: 'bg-green-600 border-green-800', textColor: 'text-green-100', label: '10' };
+        case 5:
+          return { height: 'h-18', width: 'w-3', bg: 'bg-zinc-200 border-zinc-400', textColor: 'text-zinc-800', label: '5' };
+        case 2.5:
+          return { height: 'h-14', width: 'w-3', bg: 'bg-zinc-800 border-zinc-950', textColor: 'text-zinc-300', label: '2.5' };
+        case 1.25:
+          return { height: 'h-10', width: 'w-2.5', bg: 'bg-zinc-400 border-zinc-500', textColor: 'text-zinc-900', label: '1.2' };
+        default:
+          return { height: 'h-10', width: 'w-2', bg: 'bg-zinc-500 border-zinc-600', textColor: 'text-white', label: '' };
+      }
     }
   };
 
-  const barOptions = [
+  const barOptions = isLbs ? [
+    { label: '45lbs', value: 45 },
+    { label: '35lbs', value: 35 },
+    { label: '25lbs', value: 25 },
+    { label: '15lbs', value: 15 },
+    { label: '0lbs', value: 0 },
+  ] : [
     { label: '20kg', value: 20 },
     { label: '15kg', value: 15 },
     { label: '10kg', value: 10 },
@@ -65,8 +91,8 @@ function PlateCalculator({ weight, onClose }) {
         </div>
 
         <div className="text-center space-y-1">
-          <p className="text-4xl font-black text-primary">{weight} <span className="text-sm font-normal text-muted-foreground uppercase tracking-widest">kg</span></p>
-          <p className="text-xs text-muted-foreground">Using {barWeight}kg Barbell ({platesNeeded.length > 0 ? `${(weight - barWeight).toFixed(1)}kg plates total` : 'no extra plates'})</p>
+          <p className="text-4xl font-black text-primary">{weight} <span className="text-sm font-normal text-muted-foreground uppercase tracking-widest">{units}</span></p>
+          <p className="text-xs text-muted-foreground">Using {barWeight}{units} Barbell ({platesNeeded.length > 0 ? `${(weight - barWeight).toFixed(1)}${units} plates total` : 'no extra plates'})</p>
         </div>
 
         {/* Barbell Selector UI */}
@@ -118,7 +144,7 @@ function PlateCalculator({ weight, onClose }) {
                   setBarWeight(val);
                 }}
               />
-              <span className="text-xs font-bold text-muted-foreground uppercase">kg</span>
+              <span className="text-xs font-bold text-muted-foreground uppercase">{units}</span>
             </div>
           )}
         </div>
@@ -142,7 +168,7 @@ function PlateCalculator({ weight, onClose }) {
                   <div 
                     key={idx} 
                     className={`${info.height} ${info.width} ${info.bg} border rounded-md flex items-center justify-center shadow-lg relative group transition-all duration-300 hover:scale-105`}
-                    title={`${p} kg Plate`}
+                    title={`${p} ${units} Plate`}
                   >
                     <span className={`text-[8px] font-black tracking-tighter select-none pointer-events-none origin-center rotate-90 whitespace-nowrap ${info.textColor}`}>
                       {info.label}
@@ -160,16 +186,21 @@ function PlateCalculator({ weight, onClose }) {
           <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Per Side:</p>
           {platesNeeded.length > 0 ? (
             <div className="flex flex-wrap gap-2">
-              {platesNeeded.map((p, i) => (
-                <div key={i} className={`px-4 py-2 rounded-xl font-bold border-b-4 transition-all ${
-                  p >= 20 ? 'bg-red-500 border-red-700 text-white' :
-                  p >= 10 ? 'bg-blue-500 border-blue-700 text-white' :
-                  p >= 5 ? 'bg-yellow-500 border-yellow-700 text-black' :
-                  'bg-secondary border-border text-foreground'
-                }`}>
-                  {p} kg
-                </div>
-              ))}
+              {platesNeeded.map((p, i) => {
+                const isHeavy = isLbs ? p >= 35 : p >= 15;
+                const isMedium = isLbs ? p >= 25 : p >= 10;
+                const isLight = isLbs ? p >= 10 : p >= 5;
+                return (
+                  <div key={i} className={`px-4 py-2 rounded-xl font-bold border-b-4 transition-all ${
+                    isHeavy ? 'bg-red-500 border-red-700 text-white' :
+                    isMedium ? 'bg-blue-500 border-blue-700 text-white' :
+                    isLight ? 'bg-yellow-500 border-yellow-700 text-black' :
+                    'bg-secondary border-border text-foreground'
+                  }`}>
+                    {p} {units}
+                  </div>
+                );
+              })}
             </div>
           ) : (
             <p className="text-sm text-center py-4 bg-secondary/50 rounded-xl italic">Only the bar!</p>
@@ -187,7 +218,7 @@ function PlateCalculator({ weight, onClose }) {
   );
 }
 
-export function WorkoutLogger({ routine, history, onSave, onCancel, onMinimize }) {
+export function WorkoutLogger({ routine, history, profile, onSave, onCancel, onMinimize }) {
   const { user } = useAuth();
   const [restStartTime, setRestStartTime] = useState(null);
   const [openHistories, setOpenHistories] = useState({});
@@ -448,8 +479,22 @@ export function WorkoutLogger({ routine, history, onSave, onCancel, onMinimize }
   };
 
   const handleFinish = () => {
+    const cleanedExercises = workout.exercises
+      .map(ex => ({
+        ...ex,
+        sets: ex.sets.filter(s => s.completed && s.weight !== '' && s.reps !== '')
+      }))
+      .filter(ex => ex.sets.length > 0);
+
+    if (cleanedExercises.length === 0) {
+      if (!window.confirm("You haven't logged any completed sets. Save this workout anyway?")) {
+        return;
+      }
+    }
+
     onSave({
       ...workout,
+      exercises: cleanedExercises,
       duration: Math.min(Math.floor(elapsed / 60), 300),
       date: new Date().toISOString()
     });
@@ -706,7 +751,7 @@ export function WorkoutLogger({ routine, history, onSave, onCancel, onMinimize }
 
       {/* Plate Calculator Overlay */}
       {showPlateCalc && (
-        <PlateCalculator weight={showPlateCalc.weight} onClose={() => setShowPlateCalc(null)} />
+        <PlateCalculator weight={showPlateCalc.weight} units={profile?.units || 'kg'} onClose={() => setShowPlateCalc(null)} />
       )}
 
       {/* Rest Timer Modal */}
