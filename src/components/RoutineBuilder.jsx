@@ -1,5 +1,13 @@
 import { useState } from 'react';
-import { Plus, Trash2, Dumbbell, Save, X, Share2, Download, Library, User, Globe, Lock, Edit2, ChevronUp, ChevronDown } from 'lucide-react';
+import { Plus, Trash2, Dumbbell, Save, X, Share2, Download, Library, User, Globe, Lock, Edit2, ChevronUp, ChevronDown, Link2 } from 'lucide-react';
+
+export const SUPERSET_COLORS = {
+  'A': 'border-violet-500 text-violet-500 bg-violet-500/10',
+  'B': 'border-emerald-500 text-emerald-500 bg-emerald-500/10',
+  'C': 'border-blue-500 text-blue-500 bg-blue-500/10',
+  'D': 'border-orange-500 text-orange-500 bg-orange-500/10',
+  'E': 'border-pink-500 text-pink-500 bg-pink-500/10',
+};
 
 export const EXERCISE_CATEGORIES = [
   'arms', 'shoulders', 'abs', 'chest', 'back', 'legs', 'gluteus', 'forearms'
@@ -45,6 +53,52 @@ export function RoutineBuilder({ routines, addRoutine, deleteRoutine, updateRout
     is_public: true,
     exercises: [{ name: '', sets: 3, reps: 10, category: 'arms', type: 'main' }]
   });
+
+  const toggleSupersetLink = (index) => {
+    const target = editingRoutine || newRoutine;
+    const updatedExercises = [...target.exercises];
+    
+    if (index === 0) return;
+
+    const currentEx = updatedExercises[index];
+    const prevEx = updatedExercises[index - 1];
+
+    if (currentEx.superset_group && currentEx.superset_group === prevEx.superset_group) {
+      currentEx.superset_group = null;
+    } else {
+      if (prevEx.superset_group) {
+        currentEx.superset_group = prevEx.superset_group;
+      } else {
+        const existingGroups = new Set(updatedExercises.map(e => e.superset_group).filter(Boolean));
+        let nextGroup = 'A';
+        const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        for (let i = 0; i < alphabet.length; i++) {
+          if (!existingGroups.has(alphabet[i])) {
+            nextGroup = alphabet[i];
+            break;
+          }
+        }
+        prevEx.superset_group = nextGroup;
+        currentEx.superset_group = nextGroup;
+      }
+    }
+
+    const groupCounts = {};
+    updatedExercises.forEach(e => {
+      if (e.superset_group) {
+        groupCounts[e.superset_group] = (groupCounts[e.superset_group] || 0) + 1;
+      }
+    });
+
+    updatedExercises.forEach(e => {
+      if (e.superset_group && groupCounts[e.superset_group] < 2) {
+        e.superset_group = null;
+      }
+    });
+
+    const updated = { ...target, exercises: updatedExercises };
+    editingRoutine ? setEditingRoutine(updated) : setNewRoutine(updated);
+  };
 
   const handleAddExercise = () => {
     const target = editingRoutine || newRoutine;
@@ -197,32 +251,61 @@ export function RoutineBuilder({ routines, addRoutine, deleteRoutine, updateRout
 
             <div className="space-y-4">
               <label className="block text-sm font-medium">Exercises</label>
-              {routineToEdit.exercises.map((ex, idx) => (
-                <div key={idx} className="p-4 bg-secondary/50 border border-border rounded-xl space-y-4 relative">
-                  <div className="absolute top-4 right-4 flex gap-2">
-                    <div className="flex flex-col gap-1">
+              {routineToEdit.exercises.map((ex, idx) => {
+                const groupColor = ex.superset_group ? (SUPERSET_COLORS[ex.superset_group] || 'border-primary text-primary bg-primary/10') : '';
+                return (
+                  <div key={idx} className={`p-4 bg-secondary/50 border rounded-xl space-y-4 relative transition-all ${
+                    ex.superset_group ? `border-l-4 ${groupColor.split(' ')[0]}` : 'border-border'
+                  }`}>
+                    <div className="absolute top-4 right-4 flex gap-2">
+                      {idx > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => toggleSupersetLink(idx)}
+                          className={`p-2 rounded-lg border flex items-center justify-center transition-all self-center ${
+                            ex.superset_group && ex.superset_group === routineToEdit.exercises[idx - 1]?.superset_group
+                              ? 'bg-violet-500/20 border-violet-500/50 text-violet-400'
+                              : 'bg-secondary border-border text-muted-foreground hover:text-foreground'
+                          }`}
+                          title={ex.superset_group && ex.superset_group === routineToEdit.exercises[idx - 1]?.superset_group ? "Unlink from Above" : "Link with Above as Superset"}
+                        >
+                          <Link2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                      <div className="flex flex-col gap-1">
+                        <button 
+                          type="button"
+                          onClick={() => moveExercise(idx, 'up')}
+                          disabled={idx === 0}
+                          className="p-1 text-muted-foreground hover:text-primary disabled:opacity-0 transition-all"
+                        >
+                          <ChevronUp className="w-4 h-4" />
+                        </button>
+                        <button 
+                          type="button"
+                          onClick={() => moveExercise(idx, 'down')}
+                          disabled={idx === routineToEdit.exercises.length - 1}
+                          className="p-1 text-muted-foreground hover:text-primary disabled:opacity-0 transition-all"
+                        >
+                          <ChevronDown className="w-4 h-4" />
+                        </button>
+                      </div>
                       <button 
-                        onClick={() => moveExercise(idx, 'up')}
-                        disabled={idx === 0}
-                        className="p-1 text-muted-foreground hover:text-primary disabled:opacity-0 transition-all"
+                        type="button"
+                        onClick={() => handleRemoveExercise(idx)}
+                        className="text-red-500 hover:text-red-400 self-center"
                       >
-                        <ChevronUp className="w-4 h-4" />
-                      </button>
-                      <button 
-                        onClick={() => moveExercise(idx, 'down')}
-                        disabled={idx === routineToEdit.exercises.length - 1}
-                        className="p-1 text-muted-foreground hover:text-primary disabled:opacity-0 transition-all"
-                      >
-                        <ChevronDown className="w-4 h-4" />
+                        <Trash2 className="w-5 h-5" />
                       </button>
                     </div>
-                    <button 
-                      onClick={() => handleRemoveExercise(idx)}
-                      className="text-red-500 hover:text-red-400 self-center"
-                    >
-                      <Trash2 className="w-5 h-5" />
-                    </button>
-                  </div>
+
+                    {ex.superset_group && (
+                      <div className="w-fit">
+                        <span className={`inline-flex items-center gap-1 text-[9px] font-black uppercase px-2 py-0.5 rounded-full border ${groupColor}`}>
+                          Superset {ex.superset_group}
+                        </span>
+                      </div>
+                    )}
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="md:col-span-2">
@@ -284,7 +367,7 @@ export function RoutineBuilder({ routines, addRoutine, deleteRoutine, updateRout
                     </div>
                   </div>
                 </div>
-              ))}
+              )})}
             </div>
 
             <button
@@ -347,6 +430,11 @@ export function RoutineBuilder({ routines, addRoutine, deleteRoutine, updateRout
                 {routine.exercises.map((ex, i) => (
                   <div key={i} className="text-sm flex justify-between items-center text-muted-foreground">
                     <div className="flex items-center gap-2">
+                      {ex.superset_group && (
+                        <span className="text-[8px] font-black px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20">
+                          {ex.superset_group}
+                        </span>
+                      )}
                       <span className="w-1.5 h-1.5 rounded-full bg-primary/40"></span>
                       <span>{ex.name}</span>
                     </div>

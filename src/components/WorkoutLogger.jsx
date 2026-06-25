@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { RestMinigames } from './Minigames';
 import confetti from 'canvas-confetti';
 
-import { EXERCISE_CATEGORIES } from './RoutineBuilder';
+import { EXERCISE_CATEGORIES, SUPERSET_COLORS } from './RoutineBuilder';
 
 function PlateCalculator({ weight, onClose, units = 'kg' }) {
   const isLbs = units === 'lbs';
@@ -222,6 +222,74 @@ export function WorkoutLogger({ routine, history, profile, onSave, onCancel, onM
   const { user } = useAuth();
   const [restStartTime, setRestStartTime] = useState(null);
   const [openHistories, setOpenHistories] = useState({});
+  const [nextUpSet, setNextUpSet] = useState(null);
+
+  const determineNextSet = (exIdx, setIdx) => {
+    const currentEx = workout.exercises[exIdx];
+    const group = currentEx.superset_group;
+
+    if (group) {
+      const groupExs = workout.exercises
+        .map((ex, idx) => ({ ...ex, originalIndex: idx }))
+        .filter(ex => ex.superset_group === group);
+
+      const positionInGroup = groupExs.findIndex(ex => ex.originalIndex === exIdx);
+      const nextPosition = (positionInGroup + 1) % groupExs.length;
+      const nextEx = groupExs[nextPosition];
+      const targetSetIdx = nextPosition === 0 ? setIdx + 1 : setIdx;
+
+      if (nextEx.sets[targetSetIdx]) {
+        const lastPerf = lastPerformances[nextEx.name]?.[targetSetIdx];
+        return {
+          exerciseName: nextEx.name,
+          exerciseIndex: nextEx.originalIndex,
+          setIndex: targetSetIdx,
+          weight: nextEx.sets[targetSetIdx].weight || lastPerf?.weight || '',
+          reps: nextEx.sets[targetSetIdx].reps || lastPerf?.reps || 10
+        };
+      }
+    }
+
+    if (currentEx.sets[setIdx + 1]) {
+      return {
+        exerciseName: currentEx.name,
+        exerciseIndex: exIdx,
+        setIndex: setIdx + 1,
+        weight: currentEx.sets[setIdx + 1].weight || '',
+        reps: currentEx.sets[setIdx + 1].reps || 10
+      };
+    }
+
+    if (workout.exercises[exIdx + 1]) {
+      const nextEx = workout.exercises[exIdx + 1];
+      const lastPerf = lastPerformances[nextEx.name]?.[0];
+      return {
+        exerciseName: nextEx.name,
+        exerciseIndex: exIdx + 1,
+        setIndex: 0,
+        weight: nextEx.sets[0].weight || lastPerf?.weight || '',
+        reps: nextEx.sets[0].reps || lastPerf?.reps || 10
+      };
+    }
+
+    return null;
+  };
+
+  const handleCloseRestTimer = () => {
+    setIsResting(false);
+    if (nextUpSet) {
+      setTimeout(() => {
+        const el = document.getElementById(`set-row-${nextUpSet.exerciseIndex}-${nextUpSet.setIndex}`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          el.classList.add('ring-2', 'ring-primary', 'scale-[1.01]', 'duration-300');
+          setTimeout(() => {
+            el.classList.remove('ring-2', 'ring-primary', 'scale-[1.01]');
+          }, 1500);
+        }
+      }, 100);
+    }
+  };
 
   const toggleHistory = (name) => {
     setOpenHistories(prev => ({
@@ -458,8 +526,12 @@ export function WorkoutLogger({ routine, history, profile, onSave, onCancel, onM
       
       setIsResting(true);
       setRestStartTime(Date.now());
+
+      const next = determineNextSet(exIdx, setIdx);
+      setNextUpSet(next);
     } else {
       set.isPR = false;
+      setNextUpSet(null);
     }
 
     set.completed = willBeCompleted;
@@ -542,8 +614,12 @@ export function WorkoutLogger({ routine, history, profile, onSave, onCancel, onM
           const hasPR = best && best.weight > 0;
           const bestText = hasPR ? `${best.weight}kg x ${best.reps}` : 'No PR';
 
+          const groupColor = ex.superset_group ? (SUPERSET_COLORS[ex.superset_group] || 'border-primary text-primary bg-primary/10') : '';
+
           return (
-            <div key={exIdx} className="bg-card border border-border rounded-[2.5rem] overflow-hidden shadow-sm">
+            <div key={exIdx} className={`bg-card border rounded-[2.5rem] overflow-hidden shadow-sm transition-all duration-300 ${
+              ex.superset_group ? `border-l-8 ${groupColor.split(' ')[0]}` : 'border-border'
+            }`}>
               <div className="p-5 border-b border-border bg-secondary/30 flex flex-col gap-4">
                 <div className="flex justify-between items-start gap-4">
                   <div className="flex-1">
@@ -588,6 +664,14 @@ export function WorkoutLogger({ routine, history, profile, onSave, onCancel, onM
                       >
                         <History className="w-3.5 h-3.5 text-muted-foreground/80 hover:text-primary" /> History
                       </button>
+                      {ex.superset_group && (
+                        <>
+                          <span className="w-1 h-1 rounded-full bg-border" />
+                          <span className={`inline-flex items-center gap-1 text-[8px] font-black uppercase px-2 py-0.5 rounded-full border ${groupColor}`}>
+                            Superset {ex.superset_group}
+                          </span>
+                        </>
+                      )}
                     </div>
                   </div>
                   <button 
@@ -665,7 +749,11 @@ export function WorkoutLogger({ routine, history, profile, onSave, onCancel, onM
                   const placeholderReps = lastSetData?.reps || "0";
 
                   return (
-                    <div key={setIdx} className={`grid grid-cols-[30px_1fr_1fr_45px_45px] gap-3 items-center transition-all ${set.completed ? 'opacity-40' : ''}`}>
+                    <div 
+                      key={setIdx} 
+                      id={`set-row-${exIdx}-${setIdx}`}
+                      className={`grid grid-cols-[30px_1fr_1fr_45px_45px] gap-3 items-center transition-all duration-300 rounded-2xl p-1 ${set.completed ? 'opacity-40' : ''}`}
+                    >
                       <div className="text-sm font-black italic text-muted-foreground/30">{setIdx + 1}</div>
                       
                       <div className="relative group">
@@ -768,15 +856,25 @@ export function WorkoutLogger({ routine, history, profile, onSave, onCancel, onM
               </p>
             </div>
 
+            {nextUpSet && (
+              <div className="bg-secondary/40 border border-border/60 p-4 rounded-2xl text-center space-y-1.5 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                <span className="text-[9px] font-black text-primary uppercase tracking-[0.2em]">Next Up</span>
+                <p className="font-black text-white text-base truncate uppercase">{nextUpSet.exerciseName}</p>
+                <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                  Set {nextUpSet.setIndex + 1} • {nextUpSet.weight ? `${nextUpSet.weight}${profile?.units || 'kg'}` : `No ${profile?.units || 'kg'}`} x {nextUpSet.reps} reps
+                </p>
+              </div>
+            )}
+
             <div className="flex flex-col gap-3">
               <button 
-                onClick={() => setIsResting(false)}
+                onClick={handleCloseRestTimer}
                 className="w-full py-5 bg-primary text-white font-black uppercase tracking-widest rounded-[2rem] shadow-2xl shadow-primary/30 active:scale-95 transition-all"
               >
                 End Rest
               </button>
               <button 
-                onClick={() => setIsResting(false)}
+                onClick={handleCloseRestTimer}
                 className="w-full py-4 text-muted-foreground font-bold text-sm hover:text-white transition-colors"
               >
                 Skip Timer
