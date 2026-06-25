@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Check, Play, Save, X, Plus, Trash2, ChevronLeft, Timer, Calculator, Trophy, Info } from 'lucide-react';
+import { Check, Play, Save, X, Plus, Trash2, ChevronLeft, Timer, Calculator, Trophy, Info, History } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { RestMinigames } from './Minigames';
 import confetti from 'canvas-confetti';
@@ -7,9 +7,12 @@ import confetti from 'canvas-confetti';
 import { EXERCISE_CATEGORIES } from './RoutineBuilder';
 
 function PlateCalculator({ weight, onClose }) {
-  const barWeight = 20; // Default Olympic Bar
-  const targetSide = (weight - barWeight) / 2;
-  const availablePlates = [25, 20, 15, 10, 5, 2.5, 1.25];
+  const [barWeight, setBarWeight] = useState(20);
+  const [isCustomBar, setIsCustomBar] = useState(false);
+  const [customBarWeight, setCustomBarWeight] = useState('');
+
+  const targetSide = Math.max(0, (weight - barWeight) / 2);
+  const availablePlates = [20, 15, 10, 5, 2.5, 1.25];
   
   let remaining = targetSide;
   const platesNeeded = [];
@@ -17,14 +20,12 @@ function PlateCalculator({ weight, onClose }) {
   availablePlates.forEach(plate => {
     while (remaining >= plate) {
       platesNeeded.push(plate);
-      remaining -= plate;
+      remaining = Math.round((remaining - plate) * 100) / 100;
     }
   });
 
   const getPlateStyle = (plate) => {
     switch (plate) {
-      case 25:
-        return { height: 'h-28', width: 'w-4', bg: 'bg-red-500 border-red-700', textColor: 'text-red-100', label: '25' };
       case 20:
         return { height: 'h-28', width: 'w-4', bg: 'bg-blue-500 border-blue-700', textColor: 'text-blue-100', label: '20' };
       case 15:
@@ -42,6 +43,14 @@ function PlateCalculator({ weight, onClose }) {
     }
   };
 
+  const barOptions = [
+    { label: '20kg', value: 20 },
+    { label: '15kg', value: 15 },
+    { label: '10kg', value: 10 },
+    { label: '8kg', value: 8 },
+    { label: '0kg', value: 0 },
+  ];
+
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-card border border-border w-full max-w-sm rounded-3xl p-6 space-y-6 shadow-2xl animate-in zoom-in-95 duration-200">
@@ -57,7 +66,61 @@ function PlateCalculator({ weight, onClose }) {
 
         <div className="text-center space-y-1">
           <p className="text-4xl font-black text-primary">{weight} <span className="text-sm font-normal text-muted-foreground uppercase tracking-widest">kg</span></p>
-          <p className="text-xs text-muted-foreground">Using 20kg Standard Barbell</p>
+          <p className="text-xs text-muted-foreground">Using {barWeight}kg Barbell ({platesNeeded.length > 0 ? `${(weight - barWeight).toFixed(1)}kg plates total` : 'no extra plates'})</p>
+        </div>
+
+        {/* Barbell Selector UI */}
+        <div className="space-y-2">
+          <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest">Barbell weight</label>
+          <div className="grid grid-cols-5 gap-1 p-1 bg-secondary/50 rounded-xl">
+            {barOptions.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => {
+                  setBarWeight(opt.value);
+                  setIsCustomBar(false);
+                }}
+                className={`py-2 px-1 rounded-lg text-[10px] font-bold transition-all ${
+                  !isCustomBar && barWeight === opt.value
+                    ? 'bg-primary text-white shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => setIsCustomBar(true)}
+              className={`py-2 px-1 rounded-lg text-[10px] font-bold transition-all ${
+                isCustomBar
+                  ? 'bg-primary text-white shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              Custom
+            </button>
+          </div>
+
+          {isCustomBar && (
+            <div className="flex gap-2 items-center mt-2 animate-in fade-in slide-in-from-top-1 duration-150">
+              <input
+                type="number"
+                step="0.5"
+                min="0"
+                className="flex-1 bg-secondary border border-border rounded-xl px-3 py-2 text-xs font-bold outline-none focus:ring-1 focus:ring-primary text-center"
+                placeholder="Custom Bar Weight"
+                value={customBarWeight}
+                onChange={(e) => {
+                  setCustomBarWeight(e.target.value);
+                  const val = parseFloat(e.target.value) || 0;
+                  setBarWeight(val);
+                }}
+              />
+              <span className="text-xs font-bold text-muted-foreground uppercase">kg</span>
+            </div>
+          )}
         </div>
 
         {/* 2D Barbell Plate Visualizer */}
@@ -126,6 +189,31 @@ function PlateCalculator({ weight, onClose }) {
 
 export function WorkoutLogger({ routine, history, onSave, onCancel, onMinimize }) {
   const { user } = useAuth();
+  const [restStartTime, setRestStartTime] = useState(null);
+  const [openHistories, setOpenHistories] = useState({});
+
+  const toggleHistory = (name) => {
+    setOpenHistories(prev => ({
+      ...prev,
+      [name]: !prev[name]
+    }));
+  };
+
+  const getExerciseHistory = (exerciseName) => {
+    if (!history || !exerciseName) return [];
+    const list = [];
+    history.forEach(session => {
+      if (session.routine_name === 'Rest Day' || !session.exercises) return;
+      const found = session.exercises.find(ex => ex.name?.toLowerCase() === exerciseName.toLowerCase());
+      if (found && found.sets && found.sets.length > 0) {
+        list.push({
+          date: session.date,
+          sets: found.sets
+        });
+      }
+    });
+    return list;
+  };
   
   // Last Performance Logic: Accurately capture previous weight/reps for each set
   const lastPerformances = useMemo(() => {
@@ -249,15 +337,17 @@ export function WorkoutLogger({ routine, history, onSave, onCancel, onMinimize }
 
   useEffect(() => {
     let restInterval;
-    if (isResting) {
+    if (isResting && restStartTime) {
+      setRestElapsed(Math.floor((Date.now() - restStartTime) / 1000));
+      
       restInterval = setInterval(() => {
-        setRestElapsed(prev => prev + 1);
+        setRestElapsed(Math.floor((Date.now() - restStartTime) / 1000));
       }, 1000);
     } else {
       setRestElapsed(0);
     }
     return () => clearInterval(restInterval);
-  }, [isResting]);
+  }, [isResting, restStartTime]);
 
   const formatTime = (seconds) => {
     const h = Math.floor(seconds / 3600);
@@ -336,6 +426,7 @@ export function WorkoutLogger({ routine, history, onSave, onCancel, onMinimize }
       }
       
       setIsResting(true);
+      setRestStartTime(Date.now());
     } else {
       set.isPR = false;
     }
@@ -444,6 +535,14 @@ export function WorkoutLogger({ routine, history, onSave, onCancel, onMinimize }
                       ) : (
                         <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">No PR</p>
                       )}
+                      <span className="w-1 h-1 rounded-full bg-border" />
+                      <button
+                        type="button"
+                        onClick={() => toggleHistory(ex.name)}
+                        className="text-[10px] font-bold text-muted-foreground hover:text-primary uppercase tracking-widest flex items-center gap-1 transition-colors"
+                      >
+                        <History className="w-3.5 h-3.5 text-muted-foreground/80 hover:text-primary" /> History
+                      </button>
                     </div>
                   </div>
                   <button 
@@ -472,8 +571,41 @@ export function WorkoutLogger({ routine, history, onSave, onCancel, onMinimize }
                   </div>
                 )}
               </div>
+
+              {openHistories[ex.name] && (
+                <div className="px-5 pb-4 pt-4 border-b border-border bg-secondary/10 space-y-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                  <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Exercise History</p>
+                  {getExerciseHistory(ex.name).length > 0 ? (
+                    <div className="max-h-40 overflow-y-auto space-y-1.5 pr-1 no-scrollbar text-xs">
+                      {getExerciseHistory(ex.name).map((hEntry, hIdx) => (
+                        <div key={hIdx} className="flex justify-between items-center bg-secondary/35 border border-border/20 px-3 py-2 rounded-xl">
+                          <span className="font-bold text-muted-foreground">{new Date(hEntry.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                          <span className="font-black text-foreground">
+                            {hEntry.sets.map((s, sIdx) => `${s.weight}kg x ${s.reps}`).join(' • ')}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground italic">No past sessions recorded.</p>
+                  )}
+                </div>
+              )}
               
               <div className="p-5 space-y-4">
+                {lastPerformances[ex.name] && (
+                  <div className="bg-secondary/20 border border-border/40 p-3 rounded-[1.5rem] flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-4 mb-1 text-xs">
+                    <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Last Session sets:</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {lastPerformances[ex.name].map((s, idx) => (
+                        <span key={idx} className="bg-secondary px-2.5 py-1 rounded-xl text-[10px] font-black text-primary border border-border/40">
+                          S{idx+1}: {s.weight}kg x {s.reps}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-[30px_1fr_1fr_45px_45px] gap-3 text-[10px] font-black text-muted-foreground uppercase tracking-widest px-2">
                   <div>#</div>
                   <div className="text-center">kg</div>
