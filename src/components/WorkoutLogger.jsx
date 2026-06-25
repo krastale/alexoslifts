@@ -415,11 +415,13 @@ export function WorkoutLogger({ routine, history, profile, onSave, onCancel, onM
     const bests = {};
     history?.forEach(session => {
       session.exercises?.forEach(ex => {
+        if (!ex.name) return;
+        const key = ex.name.trim().toLowerCase();
         ex.sets?.forEach(set => {
           const w = parseFloat(set.weight) || 0;
           const r = parseInt(set.reps) || 0;
-          if (!bests[ex.name] || w > bests[ex.name].weight || (w === bests[ex.name].weight && r > bests[ex.name].reps)) {
-            bests[ex.name] = { weight: w, reps: r };
+          if (!bests[key] || w > bests[key].weight || (w === bests[key].weight && r > bests[key].reps)) {
+            bests[key] = { weight: w, reps: r };
           }
         });
       });
@@ -508,8 +510,9 @@ export function WorkoutLogger({ routine, history, profile, onSave, onCancel, onM
     if (willBeCompleted) {
       const weight = parseFloat(set.weight) || 0;
       const reps = parseInt(set.reps) || 0;
-      const exerciseName = updated.exercises[exIdx].name;
-      const best = personalBests[exerciseName];
+      const exerciseName = updated.exercises[exIdx].name || '';
+      const key = exerciseName.trim().toLowerCase();
+      const best = key ? personalBests[key] : null;
       
       // Refined PR Detection: Weight > Max OR (Weight == Max AND Reps > MaxReps)
       const isPR = weight > 0 && (!best || weight > best.weight || (weight === best.weight && reps > best.reps));
@@ -519,7 +522,8 @@ export function WorkoutLogger({ routine, history, profile, onSave, onCancel, onM
           particleCount: 150,
           spread: 70,
           origin: { y: 0.6 },
-          colors: ['#3b82f6', '#ffffff', '#60a5fa']
+          colors: ['#3b82f6', '#ffffff', '#60a5fa'],
+          zIndex: 9999
         });
         set.isPR = true;
       }
@@ -610,7 +614,7 @@ export function WorkoutLogger({ routine, history, profile, onSave, onCancel, onM
       {/* Main Content */}
       <div className="flex-1 overflow-y-auto p-4 space-y-6 pb-40">
         {workout.exercises.map((ex, exIdx) => {
-          const best = personalBests[ex.name];
+          const best = ex.name ? personalBests[ex.name.trim().toLowerCase()] : null;
           const hasPR = best && best.weight > 0;
           const bestText = hasPR ? `${best.weight}kg x ${best.reps}` : 'No PR';
 
@@ -754,7 +758,14 @@ export function WorkoutLogger({ routine, history, profile, onSave, onCancel, onM
                       id={`set-row-${exIdx}-${setIdx}`}
                       className={`grid grid-cols-[30px_1fr_1fr_45px_45px] gap-3 items-center transition-all duration-300 rounded-2xl p-1 ${set.completed ? 'opacity-40' : ''}`}
                     >
-                      <div className="text-sm font-black italic text-muted-foreground/30">{setIdx + 1}</div>
+                      <div className="flex flex-col items-center justify-center">
+                        <span className={`text-sm font-black italic ${set.isPR ? 'text-yellow-500' : 'text-muted-foreground/30'}`}>
+                          {setIdx + 1}
+                        </span>
+                        {set.isPR && (
+                          <span className="text-[7px] font-black bg-yellow-500/20 text-yellow-500 px-1 py-0.5 rounded uppercase tracking-tighter leading-none mt-0.5">PR</span>
+                        )}
+                      </div>
                       
                       <div className="relative group">
                         <input
