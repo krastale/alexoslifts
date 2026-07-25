@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { useData } from './hooks/useData';
-import { Home, Dumbbell, Settings as SettingsIcon, Loader2, BarChart2, Users } from 'lucide-react';
+import { Home, Dumbbell, Footprints, Settings as SettingsIcon, Loader2, BarChart2, Users } from 'lucide-react';
 
 import { Auth } from './components/Auth';
 import { Onboarding } from './components/Onboarding';
 import { Dashboard } from './components/Dashboard';
 import { RoutineBuilder } from './components/RoutineBuilder';
 import { WorkoutLogger } from './components/WorkoutLogger';
+import { Running } from './components/Running';
 import { Settings } from './components/Settings';
 import { Progress } from './components/Progress';
 import { Community } from './components/Community';
@@ -18,7 +19,8 @@ function AppContent() {
     profile, updateProfile, routines, addRoutine, updateRoutine, deleteRoutine, 
     history, addHistory, deleteHistory, loading: dataLoading,
     measurements, addMeasurement, deleteMeasurement,
-    photos, uploadPhoto, deletePhoto
+    photos, uploadPhoto, deletePhoto,
+    runs, addRun, deleteRun
   } = useData();
 
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -71,6 +73,8 @@ function AppContent() {
         return <Dashboard profile={profile} history={history} deleteHistory={deleteHistory} addHistory={addHistory} />;
       case 'routines':
         return <RoutineBuilder routines={routines} addRoutine={addRoutine} updateRoutine={updateRoutine} deleteRoutine={deleteRoutine} />;
+      case 'running':
+        return <Running runs={runs} addRun={addRun} deleteRun={deleteRun} />;
       case 'progress':
         return (
           <Progress
@@ -149,6 +153,16 @@ function AppContent() {
           >
             <Dumbbell className="w-6 h-6" />
             <span className="text-[10px] font-bold mt-1 uppercase tracking-tighter">Routines</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('running')}
+            className={`flex flex-col items-center p-2 rounded-xl transition-all min-w-[70px] ${
+              activeTab === 'running' ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Footprints className="w-6 h-6" />
+            <span className="text-[10px] font-bold mt-1 uppercase tracking-tighter">Running</span>
           </button>
 
           <button

@@ -9,6 +9,7 @@ export function useData() {
   const [history, setHistory] = useState([]);
   const [measurements, setMeasurements] = useState([]);
   const [photos, setPhotos] = useState([]);
+  const [runs, setRuns] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
@@ -44,6 +45,30 @@ export function useData() {
         }));
         setPhotos(photosWithUrls.filter(p => p.url)); // Only show photos that have valid URLs
       }
+
+      // Fetch runs with Supabase + localStorage fallback
+      let loadedRuns = [];
+      try {
+        const runsRes = await supabase.from('runs').select('*').eq('user_id', user.id).order('date', { ascending: false });
+        if (runsRes.data && !runsRes.error) {
+          loadedRuns = runsRes.data;
+        }
+      } catch (e) {
+        console.warn('Supabase runs query fallback:', e);
+      }
+
+      const localRunsStr = localStorage.getItem(`alexoslifts_runs_${user.id}`);
+      if (localRunsStr) {
+        try {
+          const localRuns = JSON.parse(localRunsStr);
+          const runMap = new Map();
+          [...loadedRuns, ...localRuns].forEach(r => runMap.set(r.id, r));
+          loadedRuns = Array.from(runMap.values()).sort((a, b) => new Date(b.date) - new Date(a.date));
+        } catch (e) {
+          console.error('Error parsing local runs:', e);
+        }
+      }
+      setRuns(loadedRuns);
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
@@ -208,6 +233,55 @@ export function useData() {
     return { error: dbError };
   };
 
+  const addRun = async (runData) => {
+    const newRun = {
+      id: runData.id || `run_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      user_id: user.id,
+      title: runData.title || 'Running Session',
+      run_type: runData.run_type || 'outdoor',
+      date: runData.date || new Date().toISOString(),
+      distance: Number(runData.distance) || 0,
+      duration: Number(runData.duration) || 0, // seconds
+      pace: runData.pace || '0:00',
+      avg_heart_rate: runData.avg_heart_rate ? Number(runData.avg_heart_rate) : null,
+      elevation_gain: runData.elevation_gain ? Number(runData.elevation_gain) : null,
+      cadence: runData.cadence ? Number(runData.cadence) : null,
+      calories: runData.calories ? Number(runData.calories) : null,
+      perceived_exertion: runData.perceived_exertion ? Number(runData.perceived_exertion) : null,
+      splits: runData.splits || [],
+      notes: runData.notes || ''
+    };
+
+    try {
+      const { data, error } = await supabase.from('runs').insert([newRun]).select().single();
+      if (data && !error) {
+        const updatedRuns = [data, ...runs.filter(r => r.id !== newRun.id)];
+        setRuns(updatedRuns);
+        localStorage.setItem(`alexoslifts_runs_${user.id}`, JSON.stringify(updatedRuns));
+        return { data, error: null };
+      }
+    } catch (e) {
+      console.warn('Supabase addRun fallback:', e);
+    }
+
+    const updatedRuns = [newRun, ...runs.filter(r => r.id !== newRun.id)];
+    setRuns(updatedRuns);
+    localStorage.setItem(`alexoslifts_runs_${user.id}`, JSON.stringify(updatedRuns));
+    return { data: newRun, error: null };
+  };
+
+  const deleteRun = async (id) => {
+    try {
+      await supabase.from('runs').delete().eq('id', id);
+    } catch (e) {
+      console.warn('Supabase deleteRun fallback:', e);
+    }
+    const updatedRuns = runs.filter(r => r.id !== id);
+    setRuns(updatedRuns);
+    localStorage.setItem(`alexoslifts_runs_${user.id}`, JSON.stringify(updatedRuns));
+    return { error: null };
+  };
+
   return {
     profile,
     updateProfile,
@@ -224,6 +298,9 @@ export function useData() {
     photos,
     uploadPhoto,
     deletePhoto,
+    runs,
+    addRun,
+    deleteRun,
     loading,
     refreshData: fetchData
   };
