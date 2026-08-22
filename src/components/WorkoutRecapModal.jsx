@@ -212,10 +212,6 @@ export function WorkoutRecapModal({ workout, profile, onClose, onDelete }) {
                                   <span className="bg-yellow-500 text-black text-[8px] font-black px-1.5 py-0.5 rounded flex items-center gap-0.5 uppercase tracking-tighter shadow-sm">
                                     <Trophy className="w-2.5 h-2.5 fill-black" /> PR
                                   </span>
-                                ) : set.rpe ? (
-                                  <span className="text-[9px] font-bold text-muted-foreground bg-secondary px-1.5 py-0.5 rounded">
-                                    @{set.rpe}
-                                  </span>
                                 ) : (
                                   <span className="text-muted-foreground/30">-</span>
                                 )}

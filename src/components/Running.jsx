@@ -35,7 +35,7 @@ export function Running({ runs = [], addRun, deleteRun }) {
   const [manualHr, setManualHr] = useState('');
   const [manualElevation, setManualElevation] = useState('');
   const [manualCadence, setManualCadence] = useState('');
-  const [manualRpe, setManualRpe] = useState('5');
+  const manualRpe = null;
   const [manualNotes, setManualNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -785,7 +785,7 @@ export function Running({ runs = [], addRun, deleteRun }) {
 
           <div className="space-y-3 pt-2">
             <span className="text-xs font-black uppercase tracking-widest text-muted-foreground">Optional Metrics</span>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label className="block text-[10px] font-bold uppercase text-muted-foreground mb-1">Avg HR (bpm)</label>
                 <input
@@ -815,19 +815,6 @@ export function Running({ runs = [], addRun, deleteRun }) {
                   onChange={e => setManualCadence(e.target.value)}
                   className="w-full bg-secondary border border-border rounded-xl p-3 outline-none font-bold text-xs"
                 />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold uppercase text-muted-foreground mb-1">RPE Effort (1-10)</label>
-                <select
-                  value={manualRpe}
-                  onChange={e => setManualRpe(e.target.value)}
-                  className="w-full bg-secondary border border-border rounded-xl p-3 outline-none font-bold text-xs"
-                >
-                  <option value="3">3 - Light</option>
-                  <option value="5">5 - Moderate</option>
-                  <option value="7">7 - Hard</option>
-                  <option value="9">9 - Maximum</option>
-                </select>
               </div>
             </div>
           </div>

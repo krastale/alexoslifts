@@ -2,6 +2,49 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
 
+async function autoLogMissingRestDays(loadedHistory, userId) {
+  if (!userId) return loadedHistory;
+
+  const historyDates = new Set(loadedHistory.map(w => w.date ? w.date.split('T')[0] : ''));
+  const missingRestDays = [];
+  const now = new Date();
+
+  // Check past 7 days (including today)
+  for (let i = 0; i <= 7; i++) {
+    const d = new Date();
+    d.setDate(now.getDate() - i);
+    const dateStr = d.toISOString().split('T')[0];
+
+    if (!historyDates.has(dateStr)) {
+      missingRestDays.push({
+        user_id: userId,
+        routine_name: 'Rest Day',
+        date: d.toISOString(),
+        duration: 0,
+        exercises: []
+      });
+      historyDates.add(dateStr);
+    }
+  }
+
+  if (missingRestDays.length > 0) {
+    try {
+      const { data, error } = await supabase
+        .from('history')
+        .insert(missingRestDays)
+        .select();
+
+      if (data && !error) {
+        return [...data, ...loadedHistory].sort((a, b) => new Date(b.date) - new Date(a.date));
+      }
+    } catch (e) {
+      console.warn('Auto-log rest day fallback:', e);
+    }
+  }
+
+  return loadedHistory;
+}
+
 export function useData() {
   const { user } = useAuth();
   const [profile, setProfile] = useState(null);
@@ -27,7 +70,13 @@ export function useData() {
 
       if (profileRes.data) setProfile(profileRes.data);
       if (routinesRes.data) setRoutines(routinesRes.data);
-      if (historyRes.data) setHistory(historyRes.data);
+
+      if (historyRes.data) {
+        // Auto-log missing rest days for days with no activity in the last 7 days
+        const updatedHistory = await autoLogMissingRestDays(historyRes.data, user.id);
+        setHistory(updatedHistory);
+      }
+
       if (measurementsRes.data) setMeasurements(measurementsRes.data);
       
       if (photosRes.data) {
@@ -131,19 +180,39 @@ export function useData() {
   };
 
   const addHistory = async (workout) => {
+    const workoutDateStr = (workout.date || new Date().toISOString()).split('T')[0];
+    const isRealWorkout = (workout.routineName || workout.routine_name || '').trim().toLowerCase() !== 'rest day';
+
+    // If logging a real workout for a date, delete any existing Rest Day entry for that date
+    if (isRealWorkout) {
+      const existingRestDay = history.find(w => 
+        w.date && w.date.split('T')[0] === workoutDateStr && 
+        (w.routine_name || w.routineName || '').trim().toLowerCase() === 'rest day'
+      );
+      if (existingRestDay) {
+        try {
+          await supabase.from('history').delete().eq('id', existingRestDay.id);
+        } catch (e) {
+          console.warn('Error removing auto rest day on workout log:', e);
+        }
+      }
+    }
+
     const { data, error } = await supabase
       .from('history')
       .insert([{ 
         user_id: user.id,
-        routine_name: workout.routineName,
-        date: workout.date,
-        duration: workout.duration,
-        exercises: workout.exercises
+        routine_name: workout.routineName || workout.routine_name,
+        date: workout.date || new Date().toISOString(),
+        duration: workout.duration || 0,
+        exercises: workout.exercises || []
       }])
       .select()
       .single();
     
-    if (data) setHistory([data, ...history]);
+    if (data) {
+      setHistory(prev => [data, ...prev.filter(h => h.id !== data.id && (h.date.split('T')[0] !== workoutDateStr || !isRealWorkout || (h.routine_name || h.routineName || '').trim().toLowerCase() !== 'rest day'))]);
+    }
     return { data, error };
   };
 
@@ -247,7 +316,6 @@ export function useData() {
       elevation_gain: runData.elevation_gain ? Number(runData.elevation_gain) : null,
       cadence: runData.cadence ? Number(runData.cadence) : null,
       calories: runData.calories ? Number(runData.calories) : null,
-      perceived_exertion: runData.perceived_exertion ? Number(runData.perceived_exertion) : null,
       splits: runData.splits || [],
       notes: runData.notes || ''
     };

@@ -163,7 +163,15 @@ export function Community({ profile, addRoutine }) {
               payload.new.content?.startsWith('POST_LIKE:') || 
               payload.new.content?.startsWith('POST_COMMENT:')) {
             setFeedInteractions(prev => {
-              if (prev.some(m => m.id === payload.new.id)) return prev;
+              const alreadyExists = prev.some(m => 
+                m.id === payload.new.id || 
+                (m.sender_id === payload.new.sender_id && m.content === payload.new.content && Math.abs(new Date(m.created_at || Date.now()) - new Date(payload.new.created_at || Date.now())) < 5000)
+              );
+              if (alreadyExists) {
+                return prev.map(m => 
+                  (m.sender_id === payload.new.sender_id && m.content === payload.new.content) ? payload.new : m
+                );
+              }
               return [...prev, payload.new];
             });
           }
@@ -284,7 +292,10 @@ export function Community({ profile, addRoutine }) {
     if (!text) return;
 
     const commentContent = `POST_COMMENT:${item.id}:${text}`;
+    const tempId = `temp_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    
     const newComment = {
+      id: tempId,
       sender_id: profile.id,
       receiver_id: item.user_id || profile.id,
       content: commentContent,
@@ -294,10 +305,23 @@ export function Community({ profile, addRoutine }) {
     setFeedInteractions(prev => [...prev, newComment]);
     setCommentInputs(prev => ({ ...prev, [item.id]: '' }));
 
-    const { error } = await supabase.from('messages').insert([newComment]);
+    const { data, error } = await supabase
+      .from('messages')
+      .insert([{
+        sender_id: profile.id,
+        receiver_id: item.user_id || profile.id,
+        content: commentContent,
+        created_at: newComment.created_at
+      }])
+      .select()
+      .single();
+
     if (error) {
       console.error('Error posting comment:', error);
       alert('Failed to post comment. Please try again.');
+      setFeedInteractions(prev => prev.filter(m => m.id !== tempId));
+    } else if (data) {
+      setFeedInteractions(prev => prev.map(m => m.id === tempId ? data : m));
     }
   };
 
@@ -505,8 +529,8 @@ export function Community({ profile, addRoutine }) {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-80px)] lg:h-[calc(100vh-64px)] pb-24 lg:pb-0 bg-background">
-      <header className="p-4 border-b border-border bg-background/80 backdrop-blur-md sticky top-0 z-10">
+    <div className="p-4 sm:p-6 space-y-6 pb-32 lg:pb-12 max-w-4xl mx-auto min-h-screen">
+      <header className="pb-4 border-b border-border bg-background/80 backdrop-blur-md sticky top-0 z-10">
         <div className="flex justify-between items-center mb-4">
           <h1 className="text-xl font-bold">Community</h1>
           <button 
@@ -558,9 +582,9 @@ export function Community({ profile, addRoutine }) {
         )}
       </header>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="space-y-6">
         {!activeChat && !viewingFriendRoutines && activeTab === 'feed' && (
-          <div className="p-4 space-y-6">
+          <div className="space-y-6">
             {/* Post Input */}
             <form onSubmit={handlePost} className="bg-card border border-border p-4 rounded-3xl shadow-sm space-y-3">
               <div className="flex gap-3">
@@ -603,7 +627,8 @@ export function Community({ profile, addRoutine }) {
                 const claps = feedInteractions.filter(m => m.content === `${typePrefix}:${item.id}`);
                 const hasClapped = claps.some(m => m.sender_id === profile.id);
 
-                const itemComments = feedInteractions.filter(m => m.content && m.content.startsWith(`POST_COMMENT:${item.id}:`));
+                const rawComments = feedInteractions.filter(m => m.content && m.content.startsWith(`POST_COMMENT:${item.id}:`));
+                const itemComments = Array.from(new Map(rawComments.map(c => [c.id || (c.sender_id + '_' + c.content + '_' + c.created_at), c])).values());
 
                 return (
                   <div key={`${item.type}-${item.id}`} className="bg-card border border-border p-5 rounded-3xl space-y-4 shadow-sm hover:border-primary/50 transition-colors">

@@ -739,11 +739,10 @@ export function WorkoutLogger({ routine, history, profile, onSave, onCancel, onM
                   </div>
                 )}
 
-                <div className="grid grid-cols-[30px_1fr_1fr_45px_45px] gap-3 text-[10px] font-black text-muted-foreground uppercase tracking-widest px-2">
+                <div className="grid grid-cols-[30px_1fr_1fr_45px] gap-3 text-[10px] font-black text-muted-foreground uppercase tracking-widest px-2">
                   <div>#</div>
                   <div className="text-center">kg</div>
                   <div className="text-center">Reps</div>
-                  <div className="text-center">RPE</div>
                   <div></div>
                 </div>
 
@@ -756,7 +755,7 @@ export function WorkoutLogger({ routine, history, profile, onSave, onCancel, onM
                     <div 
                       key={setIdx} 
                       id={`set-row-${exIdx}-${setIdx}`}
-                      className={`grid grid-cols-[30px_1fr_1fr_45px_45px] gap-3 items-center transition-all duration-300 rounded-2xl p-1 ${set.completed ? 'opacity-40' : ''}`}
+                      className={`grid grid-cols-[30px_1fr_1fr_45px] gap-3 items-center transition-all duration-300 rounded-2xl p-1 ${set.completed ? 'opacity-40' : ''}`}
                     >
                       <div className="flex flex-col items-center justify-center">
                         <span className={`text-sm font-black italic ${set.isPR ? 'text-yellow-500' : 'text-muted-foreground/30'}`}>
@@ -798,14 +797,6 @@ export function WorkoutLogger({ routine, history, profile, onSave, onCancel, onM
                           <span className="absolute -top-1.5 left-1/2 -translate-x-1/2 bg-background px-1 text-[8px] font-black text-primary uppercase whitespace-nowrap rounded">Last</span>
                         )}
                       </div>
-
-                      <input
-                        type="number"
-                        className="w-full bg-secondary border-none rounded-2xl py-3.5 px-1 text-center text-xs font-bold outline-none focus:ring-1 focus:ring-primary transition-all"
-                        value={set.rpe}
-                        onChange={(e) => updateSet(exIdx, setIdx, 'rpe', e.target.value)}
-                        placeholder="-"
-                      />
 
                       <div className="flex items-center gap-1.5 h-full">
                         <button
