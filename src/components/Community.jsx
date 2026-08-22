@@ -7,6 +7,8 @@ export function Community({ profile, addRoutine }) {
   const [friends, setFriends] = useState([]);
   const [feed, setFeed] = useState([]);
   const [feedInteractions, setFeedInteractions] = useState([]);
+  const [openComments, setOpenComments] = useState({});
+  const [commentInputs, setCommentInputs] = useState({});
   const [pendingRequests, setPendingRequests] = useState([]);
   const [sentRequests, setSentRequests] = useState([]);
   const [friendScores, setFriendScores] = useState({});
@@ -22,6 +24,15 @@ export function Community({ profile, addRoutine }) {
   const messagesEndRef = useRef(null);
 
   const [newMessages, setNewMessages] = useState({}); // { friendId: count }
+
+  const profilesMap = useMemo(() => {
+    const map = {};
+    if (profile?.id) map[profile.id] = profile;
+    (friends || []).forEach(f => {
+      if (f?.id) map[f.id] = f;
+    });
+    return map;
+  }, [profile, friends]);
 
   const leaderboardData = useMemo(() => {
     if (activeTab !== 'leaderboards') return null;
@@ -107,11 +118,15 @@ export function Community({ profile, addRoutine }) {
         table: 'messages',
         filter: `receiver_id=eq.${profile.id}`
       }, payload => {
-        if (!activeChat || activeChat.id !== payload.new.sender_id) {
-          setNewMessages(prev => ({
-            ...prev,
-            [payload.new.sender_id]: (prev[payload.new.sender_id] || 0) + 1
-          }));
+        if (!payload.new.content?.startsWith('FEED_LIKE:') && 
+            !payload.new.content?.startsWith('POST_LIKE:') && 
+            !payload.new.content?.startsWith('POST_COMMENT:')) {
+          if (!activeChat || activeChat.id !== payload.new.sender_id) {
+            setNewMessages(prev => ({
+              ...prev,
+              [payload.new.sender_id]: (prev[payload.new.sender_id] || 0) + 1
+            }));
+          }
         }
       })
       .subscribe();
@@ -122,7 +137,7 @@ export function Community({ profile, addRoutine }) {
   }, [profile?.id, activeChat]);
 
   useEffect(() => {
-    if (friends.length > 0) {
+    if (friends.length > 0 || profile?.id) {
       fetchFriendScores();
       fetchFeed();
 
@@ -139,13 +154,27 @@ export function Community({ profile, addRoutine }) {
             setFeed(prev => [{ ...payload.new, profile: friend }, ...prev]);
           }
         })
+        .on('postgres_changes', {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages'
+        }, payload => {
+          if (payload.new.content?.startsWith('FEED_LIKE:') || 
+              payload.new.content?.startsWith('POST_LIKE:') || 
+              payload.new.content?.startsWith('POST_COMMENT:')) {
+            setFeedInteractions(prev => {
+              if (prev.some(m => m.id === payload.new.id)) return prev;
+              return [...prev, payload.new];
+            });
+          }
+        })
         .subscribe();
 
       return () => {
         supabase.removeChannel(subscription);
       };
     }
-  }, [friends]);
+  }, [friends, profile?.id]);
 
   const fetchFriendRoutines = async (friend) => {
     setLoading(true);
@@ -203,7 +232,7 @@ export function Community({ profile, addRoutine }) {
     const { data: interactionData } = await supabase
       .from('messages')
       .select('*')
-      .or(`content.like.FEED_LIKE:%,content.like.POST_LIKE:%`);
+      .or('content.ilike.FEED_LIKE:%,content.ilike.POST_LIKE:%,content.ilike.POST_COMMENT:%');
         
     if (interactionData) {
       setFeedInteractions(interactionData);
@@ -234,7 +263,7 @@ export function Community({ profile, addRoutine }) {
 
     const newClap = {
       sender_id: profile.id,
-      receiver_id: item.user_id,
+      receiver_id: item.user_id || profile.id,
       content: `${typePrefix}:${item.id}`,
       created_at: new Date().toISOString()
     };
@@ -243,9 +272,38 @@ export function Community({ profile, addRoutine }) {
     await supabase.from('messages').insert([newClap]);
   };
 
+  const toggleComments = (itemId) => {
+    setOpenComments(prev => ({
+      ...prev,
+      [itemId]: !prev[itemId]
+    }));
+  };
+
+  const handleSendComment = async (item) => {
+    const text = commentInputs[item.id]?.trim();
+    if (!text) return;
+
+    const commentContent = `POST_COMMENT:${item.id}:${text}`;
+    const newComment = {
+      sender_id: profile.id,
+      receiver_id: item.user_id || profile.id,
+      content: commentContent,
+      created_at: new Date().toISOString()
+    };
+
+    setFeedInteractions(prev => [...prev, newComment]);
+    setCommentInputs(prev => ({ ...prev, [item.id]: '' }));
+
+    const { error } = await supabase.from('messages').insert([newComment]);
+    if (error) {
+      console.error('Error posting comment:', error);
+      alert('Failed to post comment. Please try again.');
+    }
+  };
+
   // Real-time chat subscription
   useEffect(() => {
-    if (!activeChat || !profile?.id) return;
+    if (!activeChat || !activeChat.id || !profile?.id) return;
     
     fetchMessages();
 
@@ -257,7 +315,10 @@ export function Community({ profile, addRoutine }) {
         table: 'messages',
         filter: `sender_id=eq.${activeChat.id}` // Only listen to incoming from this friend
       }, payload => {
-        if (payload.new.receiver_id === profile.id) {
+        if (payload.new.receiver_id === profile.id &&
+            !payload.new.content?.startsWith('FEED_LIKE:') && 
+            !payload.new.content?.startsWith('POST_LIKE:') && 
+            !payload.new.content?.startsWith('POST_COMMENT:')) {
           setMessages(prev => [...prev, payload.new]);
           setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
         }
@@ -542,6 +603,8 @@ export function Community({ profile, addRoutine }) {
                 const claps = feedInteractions.filter(m => m.content === `${typePrefix}:${item.id}`);
                 const hasClapped = claps.some(m => m.sender_id === profile.id);
 
+                const itemComments = feedInteractions.filter(m => m.content && m.content.startsWith(`POST_COMMENT:${item.id}:`));
+
                 return (
                   <div key={`${item.type}-${item.id}`} className="bg-card border border-border p-5 rounded-3xl space-y-4 shadow-sm hover:border-primary/50 transition-colors">
                     <div className="flex justify-between items-start">
@@ -588,13 +651,63 @@ export function Community({ profile, addRoutine }) {
                         {claps.length} {claps.length === 1 ? 'Clap' : 'Claps'}
                       </button>
                       <button 
-                        onClick={() => setActiveChat(item.profile)}
-                        className="flex items-center gap-2 text-xs font-bold text-muted-foreground hover:text-primary transition-colors"
+                        onClick={() => toggleComments(item.id)}
+                        className={`flex items-center gap-2 text-xs font-bold transition-colors ${openComments[item.id] ? 'text-primary' : 'text-muted-foreground hover:text-primary'}`}
                       >
                         <MessageCircle className="w-4 h-4" />
-                        Comment
+                        {itemComments.length} {itemComments.length === 1 ? 'Comment' : 'Comments'}
                       </button>
                     </div>
+
+                    {openComments[item.id] && (
+                      <div className="pt-3 border-t border-border/40 space-y-3 animate-in fade-in slide-in-from-top-1 duration-200">
+                        {itemComments.length > 0 ? (
+                          <div className="space-y-2 max-h-48 overflow-y-auto no-scrollbar pr-1">
+                            {itemComments.map((c, cIdx) => {
+                              const sender = profilesMap[c.sender_id] || { username: 'Lifter' };
+                              const commentBody = c.content.substring(`POST_COMMENT:${item.id}:`.length);
+                              return (
+                                <div key={c.id || cIdx} className="bg-secondary/40 border border-border/30 p-2.5 rounded-2xl flex flex-col gap-1 text-xs">
+                                  <div className="flex justify-between items-center">
+                                    <span className="font-bold text-primary">@{sender.username}</span>
+                                    <span className="text-[9px] text-muted-foreground">
+                                      {new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    </span>
+                                  </div>
+                                  <p className="text-foreground font-medium">{commentBody}</p>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-muted-foreground italic text-center py-1">No comments yet. Be the first to comment!</p>
+                        )}
+
+                        <form 
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            handleSendComment(item);
+                          }}
+                          className="flex gap-2 pt-1"
+                        >
+                          <input
+                            type="text"
+                            value={commentInputs[item.id] || ''}
+                            onChange={(e) => setCommentInputs({ ...commentInputs, [item.id]: e.target.value })}
+                            placeholder="Write a comment..."
+                            className="flex-1 bg-secondary border border-border rounded-xl px-3.5 py-2 text-xs font-bold outline-none focus:ring-1 focus:ring-primary"
+                          />
+                          <button
+                            type="submit"
+                            disabled={!commentInputs[item.id]?.trim()}
+                            className="bg-primary text-white px-3.5 py-2 rounded-xl text-xs font-bold hover:bg-primary/90 transition-all disabled:opacity-50 flex items-center gap-1"
+                          >
+                            <Send className="w-3.5 h-3.5" />
+                            Send
+                          </button>
+                        </form>
+                      </div>
+                    )}
                   </div>
                 );
               })
