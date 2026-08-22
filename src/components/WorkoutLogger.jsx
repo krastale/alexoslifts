@@ -855,8 +855,8 @@ export function WorkoutLogger({ routine, history, profile, onSave, onCancel, onM
 
       {/* Rest Timer Modal */}
       {isResting && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[150] flex items-center justify-center p-6">
-          <div className="w-full max-w-sm bg-card border border-border rounded-[3rem] p-8 text-center space-y-8 animate-in zoom-in-95 duration-300">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[150] flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+          <div className="w-full max-w-sm bg-card border border-border rounded-[2.5rem] sm:rounded-[3rem] p-6 sm:p-8 text-center space-y-6 sm:space-y-8 animate-in zoom-in-95 duration-300 max-h-[90vh] overflow-y-auto no-scrollbar my-auto">
             <div className="space-y-2">
               <div className="flex items-center justify-center gap-2 text-primary">
                 <Timer className="w-5 h-5 animate-pulse" />

@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { WorkoutCalendar } from './WorkoutCalendar';
 
-export function Progress({ profile, updateProfile, history, measurements, addMeasurement, deleteMeasurement, photos, uploadPhoto, deletePhoto }) {
+export function Progress({ profile, updateProfile, history, deleteHistory, measurements, addMeasurement, deleteMeasurement, photos, uploadPhoto, deletePhoto }) {
   const [isAddingMeasurement, setIsAddingMeasurement] = useState(false);
   const [isManagingTypes, setIsManagingTypes] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -301,7 +301,7 @@ export function Progress({ profile, updateProfile, history, measurements, addMea
           <CalendarIcon className="w-5 h-5 text-muted-foreground" />
           Workout Calendar
         </h2>
-        <WorkoutCalendar history={history} />
+        <WorkoutCalendar history={history} profile={profile} deleteHistory={deleteHistory} />
       </section>
 
       {/* Trophy Room & Milestones Section */}

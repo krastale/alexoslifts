@@ -81,6 +81,7 @@ function AppContent() {
             profile={profile}
             updateProfile={updateProfile}
             history={history}
+            deleteHistory={deleteHistory}
             measurements={measurements}
             addMeasurement={addMeasurement}
             deleteMeasurement={deleteMeasurement}

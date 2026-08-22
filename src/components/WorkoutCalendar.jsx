@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { ChevronLeft, ChevronRight, Dumbbell, Coffee } from 'lucide-react';
+import { WorkoutRecapModal } from './WorkoutRecapModal';
 
-export function WorkoutCalendar({ history }) {
+export function WorkoutCalendar({ history = [], profile, deleteHistory }) {
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [recapWorkout, setRecapWorkout] = useState(null);
 
   const daysInMonth = (year, month) => new Date(year, month + 1, 0).getDate();
   const firstDayOfMonth = (year, month) => new Date(year, month, 1).getDay();
@@ -112,16 +114,20 @@ export function WorkoutCalendar({ history }) {
             workoutDays[selectedDate].map(workout => {
               const isRest = (workout.routine_name || workout.routineName || '').trim().toLowerCase() === 'rest day';
               return (
-                <div key={workout.id} className="bg-secondary/50 p-4 rounded-2xl flex justify-between items-center border border-border/50">
+                <div 
+                  key={workout.id} 
+                  onClick={() => setRecapWorkout(workout)}
+                  className="bg-secondary/50 p-4 rounded-2xl flex justify-between items-center border border-border/50 hover:border-primary/50 cursor-pointer transition-all group"
+                >
                   <div>
-                    <p className="font-bold flex items-center gap-2">
+                    <p className="font-bold flex items-center gap-2 group-hover:text-primary transition-colors">
                       {workout.routine_name || workout.routineName}
                       {isRest && <span className="text-sm">☕</span>}
                     </p>
                     {!isRest ? (
-                      <p className="text-xs text-muted-foreground">{workout.exercises?.length || 0} Exercises • {workout.duration || 0} min</p>
+                      <p className="text-xs text-muted-foreground">{workout.exercises?.length || 0} Exercises • {workout.duration || 0} min (Tap for recap)</p>
                     ) : (
-                      <p className="text-xs text-muted-foreground">Rest & recovery day</p>
+                      <p className="text-xs text-muted-foreground">Rest & recovery day (Tap for details)</p>
                     )}
                   </div>
                   {isRest ? (
@@ -163,6 +169,19 @@ export function WorkoutCalendar({ history }) {
         <div className="text-center py-4">
           <p className="text-xs text-muted-foreground italic">Select a marked day to see workout details</p>
         </div>
+      )}
+
+      {/* Workout Recap Modal */}
+      {recapWorkout && (
+        <WorkoutRecapModal
+          workout={recapWorkout}
+          profile={profile}
+          onClose={() => setRecapWorkout(null)}
+          onDelete={async (id) => {
+            if (deleteHistory) await deleteHistory(id);
+            setRecapWorkout(null);
+          }}
+        />
       )}
     </div>
   );

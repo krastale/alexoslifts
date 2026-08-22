@@ -3,6 +3,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, PieChart, Pie, Cell, BarChart, Bar
 } from 'recharts';
 import { Trophy, Flame, Dumbbell, TrendingUp, Activity, PieChart as PieIcon, Trash2, Calendar, Coffee, ChevronDown, Sparkles } from 'lucide-react';
+import { WorkoutRecapModal } from './WorkoutRecapModal';
 
 const MUSCLE_COLORS = {
   'chest': '#3b82f6',
@@ -160,6 +161,7 @@ const MuscleHeatmap = ({ muscleData }) => {
 
 export function Dashboard({ profile, history, deleteHistory, addHistory }) {
   const [timeRange, setTimeRange] = useState('all');
+  const [selectedRecapWorkout, setSelectedRecapWorkout] = useState(null);
 
   const filteredHistory = useMemo(() => {
     if (!history) return [];
@@ -636,9 +638,13 @@ export function Dashboard({ profile, history, deleteHistory, addHistory }) {
             filteredHistory.slice(0, 5).map((workout) => {
               const isRest = (workout.routine_name || workout.routineName || '').trim().toLowerCase() === 'rest day';
               return (
-                <div key={workout.id} className={`bg-card border p-5 rounded-3xl flex justify-between items-center group transition-all relative ${
-                  isRest ? 'border-border/50 hover:border-amber-500/30' : 'border-border hover:border-primary/50'
-                }`}>
+                <div 
+                  key={workout.id} 
+                  onClick={() => setSelectedRecapWorkout(workout)}
+                  className={`bg-card border p-5 rounded-3xl flex justify-between items-center group transition-all relative cursor-pointer ${
+                    isRest ? 'border-border/50 hover:border-amber-500/30' : 'border-border hover:border-primary/50'
+                  }`}
+                >
                   <div className="flex items-center gap-4">
                     <div className={`p-3 rounded-2xl transition-colors ${
                       isRest 
@@ -679,7 +685,10 @@ export function Dashboard({ profile, history, deleteHistory, addHistory }) {
                       </div>
                     )}
                     <button 
-                      onClick={() => handleDelete(workout.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDelete(workout.id);
+                      }}
                       className="p-2 text-muted-foreground hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
                       title="Delete workout"
                     >
@@ -697,6 +706,19 @@ export function Dashboard({ profile, history, deleteHistory, addHistory }) {
           )}
         </div>
       </div>
+
+      {/* Workout Recap Modal */}
+      {selectedRecapWorkout && (
+        <WorkoutRecapModal 
+          workout={selectedRecapWorkout}
+          profile={profile}
+          onClose={() => setSelectedRecapWorkout(null)}
+          onDelete={async (id) => {
+            await deleteHistory(id);
+            setSelectedRecapWorkout(null);
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../supabaseClient';
-import { Play, RotateCcw, Trophy, Target, Zap, Grid3X3 } from 'lucide-react';
+import { Play, RotateCcw, Trophy, Target, Zap, Grid3X3, ChevronUp, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const ReactionGame = React.memo(({ onScore }) => {
   const [gameState, setGameState] = useState('idle'); // idle, waiting, ready, done
@@ -113,6 +113,7 @@ const Game128 = React.memo(({ onScore }) => {
   const [score, setScore] = useState(0);
   const [gameOver, setGameOver] = useState(false);
   const [won, setWon] = useState(false);
+  const touchStartRef = useRef(null);
 
   const initGame = useCallback(() => {
     let newGrid = Array(16).fill(0);
@@ -200,6 +201,46 @@ const Game128 = React.memo(({ onScore }) => {
     return () => window.removeEventListener('keydown', handleKey);
   }, [move]);
 
+  // Mobile Swipe Gesture Handlers
+  const handleTouchStart = (e) => {
+    if (e.touches && e.touches.length === 1) {
+      touchStartRef.current = {
+        x: e.touches[0].clientX,
+        y: e.touches[0].clientY
+      };
+    }
+  };
+
+  const handleTouchEnd = (e) => {
+    if (!touchStartRef.current || !e.changedTouches || e.changedTouches.length === 0) return;
+    const touchEnd = {
+      x: e.changedTouches[0].clientX,
+      y: e.changedTouches[0].clientY
+    };
+    const deltaX = touchEnd.x - touchStartRef.current.x;
+    const deltaY = touchEnd.y - touchStartRef.current.y;
+    const minSwipeDistance = 25; // Minimum px threshold for swipe
+
+    if (Math.abs(deltaX) > Math.abs(deltaY)) {
+      if (Math.abs(deltaX) > minSwipeDistance) {
+        if (deltaX > 0) {
+          move('right');
+        } else {
+          move('left');
+        }
+      }
+    } else {
+      if (Math.abs(deltaY) > minSwipeDistance) {
+        if (deltaY > 0) {
+          move('down');
+        } else {
+          move('up');
+        }
+      }
+    }
+    touchStartRef.current = null;
+  };
+
   const colors = {
     0: 'bg-secondary/50',
     2: 'bg-primary/20 text-primary',
@@ -218,7 +259,11 @@ const Game128 = React.memo(({ onScore }) => {
         <span className="text-xs font-mono bg-secondary px-2 py-1 rounded">Score: {score}</span>
       </div>
       
-      <div className="grid grid-cols-4 gap-2 aspect-square max-w-[280px] mx-auto relative">
+      <div 
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        className="grid grid-cols-4 gap-2 aspect-square max-w-[280px] mx-auto relative select-none touch-none bg-secondary/30 p-2 rounded-2xl border border-border/40"
+      >
         {grid.map((v, i) => (
           <div key={i} className={`aspect-square rounded-lg flex items-center justify-center font-bold text-lg transition-all duration-100 ${colors[v] || 'bg-yellow-600'}`}>
             {v !== 0 && v}
@@ -230,7 +275,7 @@ const Game128 = React.memo(({ onScore }) => {
             <h4 className="text-xl font-bold mb-2">{won ? 'You Win!' : 'Game Over'}</h4>
             <button 
               onClick={(e) => { e.stopPropagation(); initGame(); }}
-              className="bg-primary text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2"
+              className="bg-primary text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 shadow-lg"
             >
               <RotateCcw className="w-4 h-4" /> Try Again
             </button>
@@ -238,13 +283,46 @@ const Game128 = React.memo(({ onScore }) => {
         )}
       </div>
 
-      <div className="grid grid-cols-3 gap-2 max-w-[150px] mx-auto pt-2">
-        <div />
-        <button onClick={(e) => {e.stopPropagation(); move('up')}} className="p-2 bg-secondary rounded-lg flex justify-center"><Zap className="w-4 h-4 rotate-180" /></button>
-        <div />
-        <button onClick={(e) => {e.stopPropagation(); move('left')}} className="p-2 bg-secondary rounded-lg flex justify-center"><Zap className="w-4 h-4 -rotate-90" /></button>
-        <button onClick={(e) => {e.stopPropagation(); move('down')}} className="p-2 bg-secondary rounded-lg flex justify-center"><Zap className="w-4 h-4" /></button>
-        <button onClick={(e) => {e.stopPropagation(); move('right')}} className="p-2 bg-secondary rounded-lg flex justify-center"><Zap className="w-4 h-4 rotate-90" /></button>
+      <div className="space-y-1 pt-1">
+        <p className="text-[10px] font-bold text-muted-foreground text-center uppercase tracking-widest">
+          Swipe board or use arrows
+        </p>
+        <div className="grid grid-cols-3 gap-1.5 max-w-[150px] mx-auto">
+          <div />
+          <button 
+            type="button"
+            onClick={(e) => { e.stopPropagation(); move('up'); }} 
+            className="p-2.5 bg-secondary hover:bg-primary/20 text-foreground active:scale-90 rounded-xl flex items-center justify-center border border-border/40 shadow-sm transition-all"
+            aria-label="Move Up"
+          >
+            <ChevronUp className="w-5 h-5 text-primary" />
+          </button>
+          <div />
+          <button 
+            type="button"
+            onClick={(e) => { e.stopPropagation(); move('left'); }} 
+            className="p-2.5 bg-secondary hover:bg-primary/20 text-foreground active:scale-90 rounded-xl flex items-center justify-center border border-border/40 shadow-sm transition-all"
+            aria-label="Move Left"
+          >
+            <ChevronLeft className="w-5 h-5 text-primary" />
+          </button>
+          <button 
+            type="button"
+            onClick={(e) => { e.stopPropagation(); move('down'); }} 
+            className="p-2.5 bg-secondary hover:bg-primary/20 text-foreground active:scale-90 rounded-xl flex items-center justify-center border border-border/40 shadow-sm transition-all"
+            aria-label="Move Down"
+          >
+            <ChevronDown className="w-5 h-5 text-primary" />
+          </button>
+          <button 
+            type="button"
+            onClick={(e) => { e.stopPropagation(); move('right'); }} 
+            className="p-2.5 bg-secondary hover:bg-primary/20 text-foreground active:scale-90 rounded-xl flex items-center justify-center border border-border/40 shadow-sm transition-all"
+            aria-label="Move Right"
+          >
+            <ChevronRight className="w-5 h-5 text-primary" />
+          </button>
+        </div>
       </div>
     </div>
   );
