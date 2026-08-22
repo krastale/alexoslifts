@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect } from 'react';
 import { 
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, PieChart, Pie, Cell, BarChart, Bar
 } from 'recharts';
-import { Trophy, Flame, Dumbbell, TrendingUp, Activity, PieChart as PieIcon, Trash2, Calendar, Coffee, ChevronDown, Sparkles } from 'lucide-react';
+import { Trophy, Flame, Dumbbell, TrendingUp, Activity, PieChart as PieIcon, Trash2, Calendar, Coffee, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
 import { WorkoutRecapModal } from './WorkoutRecapModal';
 
 const MUSCLE_COLORS = {
@@ -162,6 +162,7 @@ const MuscleHeatmap = ({ muscleData }) => {
 export function Dashboard({ profile, history, deleteHistory, addHistory }) {
   const [timeRange, setTimeRange] = useState('all');
   const [selectedRecapWorkout, setSelectedRecapWorkout] = useState(null);
+  const [showMoreRecent, setShowMoreRecent] = useState(false);
 
   const filteredHistory = useMemo(() => {
     if (!history) return [];
@@ -173,6 +174,16 @@ export function Dashboard({ profile, history, deleteHistory, addHistory }) {
     
     return history.filter(w => new Date(w.date) >= cutoff);
   }, [history, timeRange]);
+
+  // Exclude Rest Days from Recent Activity and allow viewing up to 10 workouts
+  const recentWorkouts = useMemo(() => {
+    if (!history) return [];
+    return history
+      .filter(w => (w.routine_name || w.routineName || '').trim().toLowerCase() !== 'rest day')
+      .slice(0, 10);
+  }, [history]);
+
+  const displayedRecentWorkouts = showMoreRecent ? recentWorkouts : recentWorkouts.slice(0, 5);
 
   // Exercise selection for progress graph
   const exercisesList = useMemo(() => {
@@ -632,58 +643,50 @@ export function Dashboard({ profile, history, deleteHistory, addHistory }) {
 
       {/* Recent History */}
       <div className="space-y-4">
-        <h2 className="text-sm font-black uppercase tracking-[0.2em] text-muted-foreground">Recent Activity</h2>
+        <div className="flex justify-between items-center">
+          <h2 className="text-sm font-black uppercase tracking-[0.2em] text-muted-foreground">Recent Activity</h2>
+          {recentWorkouts.length > 0 && (
+            <span className="text-xs font-bold text-muted-foreground">
+              Showing {displayedRecentWorkouts.length} of {recentWorkouts.length}
+            </span>
+          )}
+        </div>
+
         <div className="space-y-3">
-          {filteredHistory.length > 0 ? (
-            filteredHistory.slice(0, 5).map((workout) => {
-              const isRest = (workout.routine_name || workout.routineName || '').trim().toLowerCase() === 'rest day';
+          {displayedRecentWorkouts.length > 0 ? (
+            displayedRecentWorkouts.map((workout) => {
+              const totalVolume = Math.round(workout.exercises?.reduce((acc, ex) => 
+                acc + (ex.sets?.reduce((sAcc, set) => sAcc + (parseFloat(set.weight) * parseInt(set.reps) || 0), 0) || 0)
+              , 0) || 0);
+
               return (
                 <div 
                   key={workout.id} 
                   onClick={() => setSelectedRecapWorkout(workout)}
-                  className={`bg-card border p-5 rounded-3xl flex justify-between items-center group transition-all relative cursor-pointer ${
-                    isRest ? 'border-border/50 hover:border-amber-500/30' : 'border-border hover:border-primary/50'
-                  }`}
+                  className="bg-card border border-border hover:border-primary/50 p-5 rounded-3xl flex justify-between items-center group transition-all relative cursor-pointer"
                 >
                   <div className="flex items-center gap-4">
-                    <div className={`p-3 rounded-2xl transition-colors ${
-                      isRest 
-                        ? 'bg-secondary group-hover:bg-amber-500/10 text-muted-foreground group-hover:text-amber-500' 
-                        : 'bg-secondary group-hover:bg-primary/10 text-muted-foreground group-hover:text-primary'
-                    }`}>
-                      {isRest ? (
-                        <Coffee className="w-6 h-6 transition-colors" />
-                      ) : (
-                        <Dumbbell className="w-6 h-6 transition-colors" />
-                      )}
+                    <div className="p-3 rounded-2xl bg-secondary group-hover:bg-primary/10 text-muted-foreground group-hover:text-primary transition-colors">
+                      <Dumbbell className="w-6 h-6 transition-colors" />
                     </div>
                     <div>
                       <p className="font-black uppercase tracking-tight">
                         {workout.routine_name || workout.routineName}
-                        {isRest && <span className="text-sm ml-1.5">☕</span>}
                       </p>
                       <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-2">
                         <Calendar className="w-3 h-3" />
                         {new Date(workout.date).toLocaleDateString()}
-                        {!isRest && ` • ${workout.exercises?.length || 0} EX`}
+                        {` • ${workout.exercises?.length || 0} EX`}
                       </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-6">
-                    {!isRest ? (
-                      <div className="text-right">
-                        <p className="text-lg font-black text-primary">
-                          {Math.round(workout.exercises?.reduce((acc, ex) => 
-                            acc + (ex.sets?.reduce((sAcc, set) => sAcc + (parseFloat(set.weight) * parseInt(set.reps) || 0), 0) || 0)
-                          , 0) || 0).toLocaleString()}
-                        </p>
-                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{profile?.units}</p>
-                      </div>
-                    ) : (
-                      <div className="text-right">
-                        <p className="text-xs font-bold text-amber-500 uppercase tracking-widest">Rest Day</p>
-                      </div>
-                    )}
+                    <div className="text-right">
+                      <p className="text-lg font-black text-primary">
+                        {totalVolume.toLocaleString()}
+                      </p>
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{profile?.units}</p>
+                    </div>
                     <button 
                       onClick={(e) => {
                         e.stopPropagation();
@@ -701,8 +704,27 @@ export function Dashboard({ profile, history, deleteHistory, addHistory }) {
           ) : (
             <div className="bg-card border border-border p-12 rounded-3xl text-center space-y-4">
               <Dumbbell className="w-12 h-12 text-muted-foreground mx-auto opacity-20" />
-              <p className="text-muted-foreground">No recent activity found.</p>
+              <p className="text-muted-foreground">No recent workouts found.</p>
             </div>
+          )}
+
+          {recentWorkouts.length > 5 && (
+            <button
+              onClick={() => setShowMoreRecent(prev => !prev)}
+              className="w-full py-3.5 bg-secondary/40 hover:bg-secondary/70 border border-border/60 rounded-2xl text-xs font-black uppercase tracking-wider text-muted-foreground hover:text-foreground transition-all flex items-center justify-center gap-2 shadow-sm"
+            >
+              {showMoreRecent ? (
+                <>
+                  <ChevronUp className="w-4 h-4 text-primary" />
+                  Show Less
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="w-4 h-4 text-primary" />
+                  Show More ({recentWorkouts.length - 5} More Workouts)
+                </>
+              )}
+            </button>
           )}
         </div>
       </div>
